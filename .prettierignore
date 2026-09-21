@@ -1,0 +1,5 @@
+dist
+node_modules
+manuscripts
+docs/mockups
+package-lock.json
