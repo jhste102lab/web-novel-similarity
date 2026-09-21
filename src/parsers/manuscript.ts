@@ -26,14 +26,12 @@ export interface ParsedFile {
 export function buildManuscript(files: ParsedFile[]): Manuscript {
   if (files.length === 1) return fromSingleFile(files[0]!)
   const { rule, ordered } = orderFiles(files.map((f) => f.name))
-  return {
-    title: commonTitle(files.map((f) => f.name)),
-    rule,
-    parts: ordered.map(({ index, label }) => {
-      const f = files[index]!
-      return { name: f.name, lastModified: f.lastModified, label, text: f.text }
-    }),
-  }
+  const parts = ordered.map(({ index, label }) => {
+    const f = files[index]!
+    return { name: f.name, lastModified: f.lastModified, label, text: f.text }
+  })
+  // Reading order, not input order: the fallback title must not depend on how files were picked.
+  return { title: commonTitle(parts.map((p) => p.name)), rule, parts }
 }
 
 function fromSingleFile(file: ParsedFile): Manuscript {

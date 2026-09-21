@@ -94,3 +94,18 @@ Also verified in the same session: 중단 mid-run returns to the start screen wi
 both slots still loaded, `새로 비교` asks before discarding results, a `.hwp` drop
 shows `hwp는 열 수 없어요. 한글에서 hwpx로 저장해 주세요.`, PDF export produces
 paginated selectable text, and PNG export produces a 860 × 16,000 px image.
+
+## Input-format and range checks (browser, production build)
+
+| Input                                       | Result                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------ |
+| 21 files named `제N화.txt` selected at once | `21개 파일 · 21화 · 14만 자`, rule `파일명 숫자`                         |
+| `.docx` (spec-shaped OOXML, one chapter)    | 895 chars extracted, rule `회차 없음 — 위치는 문장 번호로 표시`          |
+| `.hwpx` (ZIP + `Contents/section0.xml`)     | 854 chars extracted, same rule                                           |
+| Multi-file 원고 (txt) ↔ single `.hwpx` 원고 | 1 chapter pair, `A 0화 ↔ B 본문`, 거의 동일 — cross-format compare works |
+| A range set to `10~20화`, B left at 전체    | 53 → 24 chapter pairs, every reported A chapter ≥ 10                     |
+
+Fixtures were generated locally (`.docx`/`.hwpx` written with fflate from one
+chapter of a sample manuscript) and are not committed. A file produced by 한글
+itself has not been tested; the parser only reads `Contents/section*.xml` text
+nodes, so a real file with the same part layout is expected to behave the same.
