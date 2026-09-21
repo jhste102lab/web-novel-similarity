@@ -48,22 +48,3 @@ export function similarity(a: string, b: string, minSimilarity: number): number 
   const d = boundedEditDistance(a, b, maxDist)
   return d > maxDist ? 0 : 1 - d / longer
 }
-
-/**
- * Pair score in [0,1]: character similarity, or — when characters do not align
- * (reordered clauses) — the share of common fingerprints, capped below `ngramCap`
- * so that n-gram evidence alone never reaches the upper tiers.
- */
-export function pairScore(
-  a: string,
-  b: string,
-  sharedFingerprints: number,
-  fingerprintsA: number,
-  fingerprintsB: number,
-  minSimilarity: number,
-  ngramCap: number,
-): number {
-  const edit = similarity(a, b, minSimilarity)
-  const ngram = Math.min(ngramCap, sharedFingerprints / Math.max(fingerprintsA, fingerprintsB, 1))
-  return Math.max(edit, ngram >= minSimilarity ? ngram : 0)
-}

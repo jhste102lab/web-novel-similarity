@@ -50,7 +50,7 @@ export type EditClass =
   | 'heavy'
   | 'unrelated'
 
-/** Expected tier per edit class; null = must not be reported at all. */
+/** Expected tier per edit class; null = must not be reported at all (below TIER_EDITED). */
 export const EXPECTED: Record<EditClass, Tier | null> = {
   identical: 'near',
   typo: 'near',
@@ -58,8 +58,8 @@ export const EXPECTED: Record<EditClass, Tier | null> = {
   synonym: 'edited',
   insert: 'edited',
   delete: 'edited',
-  reorder: 'partial',
-  heavy: 'partial',
+  reorder: null,
+  heavy: null,
   unrelated: null,
 }
 

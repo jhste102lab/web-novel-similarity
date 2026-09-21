@@ -33,12 +33,13 @@ text goes to the worker.
 2. **Chapters** — `parsers/chapters.ts`: filename numbers, filename order, or in-text title lines (rules in `CONTEXT.md`). `parsers/manuscript.ts` merges files into one `ManuscriptText` (`{ text, chapters }`).
 3. **Sentence index** — `engine/sentences.ts`: split on Korean sentence enders and newlines; per sentence keep start/end offsets, chapter, in-chapter ordinal, and an NFC letters-only normalised form, in typed arrays.
 4. **Candidate retrieval** — `engine/fingerprints.ts`: Rabin–Karp rolling hashes over `NGRAM`-char windows, winnowed with window `WINDOW`, inverted index over side B (over A itself in 내부 반복); fingerprints occurring in more than `MAX_POSTINGS` sentences are dropped as non-discriminative. `engine/candidates.ts` returns sentences sharing ≥ `MIN_SHARED_FINGERPRINTS` fingerprints.
-5. **Precise compare** — `engine/editDistance.ts`: Ukkonen-banded Levenshtein on the normalised sentences → ratio; when only n-gram overlap supports a pair, the score is capped below the 일부 수정 threshold (`NGRAM_SCORE_CAP`).
+5. **Precise compare** — `engine/editDistance.ts`: Ukkonen-banded Levenshtein on the normalised sentences → ratio. Pairs below `TIER_EDITED` are discarded, so nothing weaker than 일부 수정 is ever reported. There is no n-gram-only fallback: it only produced hits in the old 부분 유사 band, which was pure noise on unrelated manuscripts.
 6. **Passage chaining** — `engine/compare.ts`: pairs on one diagonal ((i,j) after (i−1,j−1)) become one passage; score = mean of member scores.
-7. **Tier + tags** — tier from the _rounded_ percentage, so a displayed "90%" is never labelled below 거의 동일. 흔한 표현 (`engine/common.ts`) = sentence ≤ `COMMON_MAX_CHARS` chars appearing in ≥ `COMMON_MIN_CHAPTERS` chapters; such a passage is listed once, not once per pair.
-8. **Repeats** — `engine/repeats.ts`: union-find over near-duplicate sentence pairs inside one manuscript; occurrences closer than `REPEAT_MIN_GAP` sentences count once.
-9. **Result cap** — findings are sorted by score/occurrence count and cut to `MAX_RESULTS`; `total` carries the uncapped count and the UI says how many were hidden. Without the cap a 2M × 2M char pair produced ~600k passages and a multi-GB DOM.
-10. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened; 1-char equal islands are folded into the surrounding change.
+7. **Noise removal** — a one-sentence passage whose text is a 흔한 표현 (`engine/common.ts`: ≤ `COMMON_MAX_CHARS` chars, appearing in ≥ `COMMON_MIN_CHAPTERS` chapters) is dropped, not tagged. The same rule drops 흔한 표현 groups in 내부 반복.
+8. **Chapter grouping** — passages are grouped by (chapter of A, chapter of B). One `ChapterMatch` = one row in the UI: tier (`near` when any of its passages is 거의 동일, from the _rounded_ percentage), `count` of suspicious passages, and the strongest `MAX_PASSAGES_PER_MATCH` of them in reading order. Scores exist only inside the engine; they are never shown, because the ratio is not calibrated against any external notion of copying.
+9. **Repeats** — `engine/repeats.ts`: union-find over near-duplicate sentence pairs inside one manuscript; occurrences closer than `REPEAT_MIN_GAP` sentences count once.
+10. **Result cap** — chapter pairs are sorted by 거의 동일 count, then passage count, and cut to `MAX_RESULTS`; `total` carries the uncapped count and the UI says how many were hidden.
+11. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened; 1-char equal islands are folded into the surrounding change.
 
 Scale target: 500 chapters × 4,000 chars per side (≈ 2M chars), ≤ 5 s.
 Measured: ~1.5–1.7 s in Node and ~7 s end to end in Chrome including parsing
@@ -78,20 +79,24 @@ interface Span {
   text: string
 }
 interface Passage {
-  tier: 'near' | 'edited' | 'partial'
-  score: number // 0–100
-  common: boolean
+  tier: 'near' | 'edited'
   a: Span
   b: Span
 }
+interface ChapterMatch {
+  a: number | null // chapter of A
+  b: number | null
+  tier: 'near' | 'edited' // 'near' when any passage is 거의 동일
+  count: number // suspicious passages in this chapter pair
+  passages: Passage[] // up to MAX_PASSAGES_PER_MATCH, strongest, in reading order
+}
 interface CompareResult {
   kind: 'compare'
-  passages: Passage[]
-  total: number // before the MAX_RESULTS cap
+  matches: ChapterMatch[]
+  total: number // chapter pairs before the MAX_RESULTS cap
 }
 interface RepeatGroup {
   text: string
-  common: boolean
   occurrences: { chapter: number | null; sentenceIndex: number }[]
 }
 interface RepeatResult {
@@ -102,7 +107,9 @@ interface RepeatResult {
 ```
 
 Tier counts are derived in the UI (`src/app/results.ts`), not carried in the
-result. Diffs are computed on demand, not stored.
+result. Diffs are computed on demand, not stored. Only suspicions reach the
+UI and the report: everything below 일부 수정, and every 흔한 표현, is dropped
+by the engine, so there is no "noise" filter to switch off.
 
 ## Thresholds
 

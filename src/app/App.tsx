@@ -6,7 +6,7 @@ import { AnalyzingScreen } from './AnalyzingScreen.tsx'
 import { ExportOverlay } from './ExportOverlay.tsx'
 import { Modal, type ModalProps } from './Modal.tsx'
 import { CompareView, RepeatView } from './ResultsScreen.tsx'
-import { filterGroups, filterPassages, type CompareFilter, type RepeatFilter } from './results.ts'
+import { filterGroups, filterMatches, type CompareFilter, type RepeatFilter } from './results.ts'
 import {
   loadSlot,
   rangeLabel,
@@ -208,9 +208,9 @@ export function App() {
                 a: manuscriptLine(results.a),
                 b: results.b ? manuscriptLine(results.b) : undefined,
               }}
-              all={(results.result as CompareResult).passages}
-              rows={filterPassages(
-                (results.result as CompareResult).passages,
+              all={(results.result as CompareResult).matches}
+              rows={filterMatches(
+                (results.result as CompareResult).matches,
                 filter as CompareFilter,
               )}
             />

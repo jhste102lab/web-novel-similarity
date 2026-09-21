@@ -1,10 +1,9 @@
 // Usage: node bench/run.ts [--report docs/plan/YYYY-MM-DD-benchmark.md]
 import { writeFileSync } from 'node:fs'
 import { compare, tierOf } from '../src/engine/compare.ts'
-import { pairScore } from '../src/engine/editDistance.ts'
-import { winnow } from '../src/engine/fingerprints.ts'
+import { similarity } from '../src/engine/editDistance.ts'
 import { normalize } from '../src/engine/sentences.ts'
-import { NGRAM_SCORE_CAP, TIER_EDITED, TIER_NEAR, TIER_PARTIAL } from '../src/shared/constants.ts'
+import { TIER_EDITED, TIER_NEAR } from '../src/shared/constants.ts'
 import type { Chapter, ManuscriptText, Tier } from '../src/shared/types.ts'
 import { CLASSES, EXPECTED, mutate, rng, type EditClass } from './mutate.ts'
 import { SEEDS, STOCK } from './seeds.ts'
@@ -30,7 +29,7 @@ function toManuscript(chapters: string[]): ManuscriptText {
 log(`# Benchmark ${new Date().toISOString().slice(0, 10)}`)
 log()
 log(
-  `Thresholds: near ≥ ${TIER_NEAR}, edited ≥ ${TIER_EDITED}, partial ≥ ${TIER_PARTIAL}. Seeds: ${SEEDS.length}.`,
+  `Thresholds: near ≥ ${TIER_NEAR}, edited ≥ ${TIER_EDITED}; below ${TIER_EDITED} nothing is reported. Seeds: ${SEEDS.length}.`,
 )
 log()
 log('## Sentence pairs (one edit class per seed)')
@@ -45,12 +44,9 @@ for (const cls of CLASSES) {
     const other = SEEDS[(i + 37) % SEEDS.length]!
     const na = normalize(s)
     const nb = normalize(mutate(cls, s, other, r))
-    const fa = winnow(na)
-    const fb = new Set(winnow(nb))
-    const shared = fa.filter((h) => fb.has(h)).length
-    const score = pairScore(na, nb, shared, fa.length, fb.size, TIER_PARTIAL, NGRAM_SCORE_CAP)
+    const score = similarity(na, nb, TIER_EDITED)
     scores.push(score)
-    const got: Tier | null = score >= TIER_PARTIAL ? tierOf(score) : null
+    const got: Tier | null = score >= TIER_EDITED ? tierOf(score) : null
     if (got === EXPECTED[cls]) agree++
   })
   scores.sort((x, y) => x - y)
@@ -100,16 +96,16 @@ const docs = buildDocs()
 const result = compare(docs.a, docs.b)
 const found = new Map<string, Tier>()
 let falsePositives = 0
-let commonTagged = 0
-for (const p of result.passages) {
-  if (p.common) commonTagged++
-  let hit = false
-  for (const [seed] of docs.planted) {
-    if (!p.a.text.includes(seed) && !seed.includes(p.a.text)) continue
-    hit = true
-    if (!found.has(seed)) found.set(seed, p.tier)
+for (const m of result.matches) {
+  for (const p of m.passages) {
+    let hit = false
+    for (const [seed] of docs.planted) {
+      if (!p.a.text.includes(seed) && !seed.includes(p.a.text)) continue
+      hit = true
+      if (!found.has(seed)) found.set(seed, p.tier)
+    }
+    if (!hit) falsePositives++
   }
-  if (!hit && !p.common) falsePositives++
 }
 log('| class | expected | planted | reported | as expected |')
 log('|---|---|---|---|---|')
@@ -120,9 +116,7 @@ for (const cls of CLASSES) {
   log(`| ${cls} | ${EXPECTED[cls] ?? '—'} | ${seeds.length} | ${reported} | ${ok} |`)
 }
 log()
-log(
-  `False positives (not planted, not 흔한 표현): ${falsePositives}. Passages tagged 흔한 표현: ${commonTagged}.`,
-)
+log(`False positives (reported passages that were not planted): ${falsePositives}.`)
 
 // 3. Performance: 500 chapters × ~4,000 chars per side, heavy overlap (worst case for candidates).
 function bigDoc(seed: number, chapters: number, charsPerChapter: number): ManuscriptText {
@@ -152,7 +146,7 @@ const t0 = performance.now()
 const big = compare(A, B)
 const ms = Math.round(performance.now() - t0)
 log(
-  `A ${A.text.length.toLocaleString()} chars, B ${B.text.length.toLocaleString()} chars, ${big.passages.length.toLocaleString()} passages, ${ms} ms (Node ${process.version}).`,
+  `A ${A.text.length.toLocaleString()} chars, B ${B.text.length.toLocaleString()} chars, ${big.total.toLocaleString()} chapter pairs, ${ms} ms (Node ${process.version}).`,
 )
 
 const reportAt = process.argv.indexOf('--report')

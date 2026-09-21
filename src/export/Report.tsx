@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { charDiff } from '../engine/diff.ts'
 import { Marked } from '../app/Marked.tsx'
-import { TIER_CLASS, TIER_LABEL, where } from '../app/results.ts'
-import type { Passage, RepeatGroup } from '../shared/types.ts'
+import { chapterLabel, ordinal, TIER_CLASS, TIER_LABEL, where } from '../app/results.ts'
+import type { ChapterMatch, Passage, RepeatGroup, Tier } from '../shared/types.ts'
 
 export interface ReportMeta {
   date: string
@@ -12,8 +12,8 @@ export interface ReportMeta {
 
 interface CompareReportProps {
   meta: ReportMeta
-  all: Passage[]
-  rows: Passage[]
+  all: ChapterMatch[]
+  rows: ChapterMatch[]
 }
 
 interface RepeatReportProps {
@@ -42,14 +42,14 @@ function Meta({ meta }: { meta: ReportMeta }) {
 }
 
 export function CompareReport({ meta, all, rows }: CompareReportProps) {
-  const n = (t: Passage['tier']): number => all.filter((p) => p.tier === t && !p.common).length
+  const n = (t: Tier): number => all.filter((m) => m.tier === t).length
   return (
     <div className="rp">
       <h1>유사도 검사 결과</h1>
       <Meta meta={meta} />
       <div className="nums">
         <div>
-          유사 구간<b>{all.filter((p) => !p.common).length}</b>
+          유사 회차<b>{all.length}</b>
         </div>
         <div>
           거의 동일<b>{n('near')}</b>
@@ -57,12 +57,9 @@ export function CompareReport({ meta, all, rows }: CompareReportProps) {
         <div>
           일부 수정<b>{n('edited')}</b>
         </div>
-        <div>
-          부분 유사<b>{n('partial')}</b>
-        </div>
       </div>
-      {rows.map((q, i) => (
-        <PassageRow key={i} q={q} />
+      {rows.map((m, i) => (
+        <MatchRow key={i} m={m} />
       ))}
       <div className="foot">{FOOT}</div>
     </div>
@@ -83,41 +80,49 @@ function useMarkedPair(a: string, b: string): [React.ReactNode, React.ReactNode]
     : [a, b]
 }
 
-function PassageRow({ q }: { q: Passage }) {
-  const [a, b] = useMarkedPair(q.a.text, q.b.text)
+function MatchRow({ m }: { m: ChapterMatch }) {
   return (
     <div className="row">
       <div className="h">
-        <i className={`dot ${TIER_CLASS[q.tier]}`} />
-        {TIER_LABEL[q.tier]} {q.score}%
+        <i className={`dot ${TIER_CLASS[m.tier]}`} />
+        {TIER_LABEL[m.tier]}
         <span>
-          A {where(q.a)} · B {where(q.b)}
+          A {chapterLabel(m.a)} · B {chapterLabel(m.b)} · 유사 문장 {m.count}개
+          {m.count > m.passages.length && ` (상위 ${m.passages.length}개)`}
         </span>
       </div>
-      <div className="ab">
-        <div>
-          <i>A {where(q.a)}</i>
-          {a}
-        </div>
-        <div>
-          <i>B {where(q.b)}</i>
-          {b}
-        </div>
+      {m.passages.map((p, i) => (
+        <PassageRow key={i} p={p} />
+      ))}
+    </div>
+  )
+}
+
+function PassageRow({ p }: { p: Passage }) {
+  const [a, b] = useMarkedPair(p.a.text, p.b.text)
+  return (
+    <div className="ab">
+      <div>
+        <i>A {ordinal(p.a)}</i>
+        {a}
+      </div>
+      <div>
+        <i>B {ordinal(p.b)}</i>
+        {b}
       </div>
     </div>
   )
 }
 
 export function RepeatReport({ meta, all, rows }: RepeatReportProps) {
-  const n = (min: number): number =>
-    all.filter((g) => g.occurrences.length >= min && !g.common).length
+  const n = (min: number): number => all.filter((g) => g.occurrences.length >= min).length
   return (
     <div className="rp">
       <h1>내부 반복 검사 결과</h1>
       <Meta meta={meta} />
       <div className="nums">
         <div>
-          반복 그룹<b>{all.filter((g) => !g.common).length}</b>
+          반복 그룹<b>{all.length}</b>
         </div>
         <div>
           3회 이상<b>{n(3)}</b>

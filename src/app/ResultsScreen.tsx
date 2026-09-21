@@ -1,12 +1,21 @@
 import { useMemo } from 'react'
 import { charDiff } from '../engine/diff.ts'
 import { Marked } from './Marked.tsx'
-import type { CompareResult, Passage, RepeatGroup, RepeatResult, Tier } from '../shared/types.ts'
+import type {
+  ChapterMatch,
+  CompareResult,
+  Passage,
+  RepeatGroup,
+  RepeatResult,
+  Tier,
+} from '../shared/types.ts'
 import {
-  filterGroups,
-  filterPassages,
   cappedNote,
+  chapterLabel,
+  filterGroups,
+  filterMatches,
   firstLine,
+  ordinal,
   TIER_CLASS,
   TIER_LABEL,
   where,
@@ -36,8 +45,6 @@ interface RepeatProps extends Common {
 
 /** A repeat group can occur hundreds of times; the detail pane lists only the first ones. */
 const MAX_OCCURRENCES = 100
-
-const Tag = () => <span className="tag">흔한 표현</span>
 
 function Tab<F>({
   cur,
@@ -69,10 +76,9 @@ export function CompareView({
   selected,
   onSelect,
 }: CompareProps) {
-  const rows = filterPassages(result.passages, filter)
-  const capped = cappedNote(result.passages.length, result.total)
-  const count = (f: CompareFilter): number => filterPassages(result.passages, f).length
-  const p = rows[selected] ?? rows[0]
+  const rows = filterMatches(result.matches, filter)
+  const capped = cappedNote(result.matches.length, result.total)
+  const m = rows[selected] ?? rows[0]
   const tierTab = (t: Tier) => (
     <Tab
       cur={filter}
@@ -83,7 +89,7 @@ export function CompareView({
           {TIER_LABEL[t]}
         </>
       }
-      count={count(t)}
+      count={filterMatches(result.matches, t).length}
       onFilter={onFilter}
     />
   )
@@ -98,68 +104,75 @@ export function CompareView({
           {capped && <span className="rng">{capped}</span>}
         </div>
         <div className="tabs">
-          <Tab cur={filter} value="all" label="전체" count={count('all')} onFilter={onFilter} />
-          {tierTab('near')}
-          {tierTab('edited')}
-          {tierTab('partial')}
           <Tab
             cur={filter}
-            value="common"
-            label="흔한 표현"
-            count={count('common')}
+            value="all"
+            label="전체"
+            count={result.matches.length}
             onFilter={onFilter}
           />
+          {tierTab('near')}
+          {tierTab('edited')}
         </div>
       </div>
       <div className="split">
         <div className="list">
           {rows.map((q, i) => (
-            <div key={i} className={`item ${q === p ? 'on' : ''}`} onClick={() => onSelect(i)}>
+            <div key={i} className={`item ${q === m ? 'on' : ''}`} onClick={() => onSelect(i)}>
               <i className={`dot ${TIER_CLASS[q.tier]}`} />
               <div className="b">
                 <div className="pos">
                   <span style={{ color: 'inherit', margin: 0 }}>
-                    {where(q.a)} ↔ {where(q.b)}
-                    {q.common && <Tag />}
+                    A {chapterLabel(q.a)} ↔ B {chapterLabel(q.b)}
                   </span>
-                  <span>{q.score}%</span>
+                  <span>유사 문장 {q.count}개</span>
                 </div>
-                <div className="ex">{firstLine(q.a)}</div>
+                <div className="ex">{firstLine(q.passages[0]!.a)}</div>
               </div>
             </div>
           ))}
         </div>
-        {p && <PassageDetail p={p} />}
+        {m && <MatchDetail m={m} />}
       </div>
     </div>
   )
 }
 
-function PassageDetail({ p }: { p: Passage }) {
-  const diff = useMemo(() => charDiff(p.a.text, p.b.text), [p])
+function MatchDetail({ m }: { m: ChapterMatch }) {
   return (
     <div className="detail">
       <div className="head">
-        <span className="pct">{p.score}%</span>
-        <span className="tier">{TIER_LABEL[p.tier]}</span>
-        {p.common && <Tag />}
+        <span className="pct">
+          A {chapterLabel(m.a)} ↔ B {chapterLabel(m.b)}
+        </span>
+        <span className="tier">{TIER_LABEL[m.tier]}</span>
         <span className="where">
-          A {where(p.a)} · B {where(p.b)}
+          유사 문장 {m.count}개
+          {m.count > m.passages.length && ` · 상위 ${m.passages.length}개 표시`}
         </span>
       </div>
-      <div className="cmp">
-        <div className="pane">
-          <div className="k">
-            <b>A</b> {where(p.a)}
-          </div>
-          <Marked diff={diff} side="a" />
+      {m.passages.map((p, i) => (
+        <PassagePair key={i} p={p} />
+      ))}
+    </div>
+  )
+}
+
+function PassagePair({ p }: { p: Passage }) {
+  const diff = useMemo(() => charDiff(p.a.text, p.b.text), [p])
+  return (
+    <div className="cmp">
+      <div className="pane">
+        <div className="k">
+          <b>A</b> {ordinal(p.a)}
         </div>
-        <div className="pane">
-          <div className="k">
-            <b>B</b> {where(p.b)}
-          </div>
-          <Marked diff={diff} side="b" />
+        <Marked diff={diff} side="a" />
+      </div>
+      <div className="pane">
+        <div className="k">
+          <b>B</b> {ordinal(p.b)}
         </div>
+        <Marked diff={diff} side="b" />
       </div>
     </div>
   )
@@ -184,13 +197,6 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
           <Tab cur={filter} value="all" label="전체" count={count('all')} onFilter={onFilter} />
           <Tab cur={filter} value={3} label="3회 이상" count={count(3)} onFilter={onFilter} />
           <Tab cur={filter} value={5} label="5회 이상" count={count(5)} onFilter={onFilter} />
-          <Tab
-            cur={filter}
-            value="common"
-            label="흔한 표현"
-            count={count('common')}
-            onFilter={onFilter}
-          />
         </div>
       </div>
       <div className="split">
@@ -200,9 +206,7 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
               <i className="dot t2" />
               <div className="b">
                 <div className="pos">
-                  <span style={{ color: 'inherit', margin: 0 }}>
-                    {q.occurrences.length}회{q.common && <Tag />}
-                  </span>
+                  <span style={{ color: 'inherit', margin: 0 }}>{q.occurrences.length}회</span>
                   <span>{span(q)}</span>
                 </div>
                 <div className="ex">{q.text}</div>
@@ -214,7 +218,6 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
           <div className="detail">
             <div className="head">
               <span className="pct">{g.occurrences.length}회</span>
-              {g.common && <Tag />}
               <span className="where">{span(g)}</span>
             </div>
             {g.occurrences.slice(0, MAX_OCCURRENCES).map((o, i) => (

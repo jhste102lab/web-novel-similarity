@@ -840,6 +840,9 @@ button {
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
+.detail .cmp + .cmp {
+  margin-top: 16px;
+}
 .pane {
   white-space: pre-line;
   background: var(--card);

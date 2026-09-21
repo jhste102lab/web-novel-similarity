@@ -30,7 +30,7 @@ export interface ManuscriptInfo {
   chapterMax: number | null
 }
 
-export type Tier = 'near' | 'edited' | 'partial'
+export type Tier = 'near' | 'edited'
 
 export interface Span {
   chapter: number | null
@@ -40,17 +40,25 @@ export interface Span {
 
 export interface Passage {
   tier: Tier
-  /** 0–100 */
-  score: number
-  common: boolean
   a: Span
   b: Span
 }
 
+/** Every suspicious passage between one chapter of A and one chapter of B. */
+export interface ChapterMatch {
+  a: number | null
+  b: number | null
+  /** 'near' when at least one passage is 거의 동일. */
+  tier: Tier
+  /** Suspicious passages in this chapter pair, including those beyond MAX_PASSAGES_PER_MATCH. */
+  count: number
+  passages: Passage[]
+}
+
 export interface CompareResult {
   kind: 'compare'
-  passages: Passage[]
-  /** Passages found before the MAX_RESULTS cap; equals passages.length when nothing was dropped. */
+  matches: ChapterMatch[]
+  /** Chapter pairs found before the MAX_RESULTS cap. */
   total: number
 }
 
@@ -61,7 +69,6 @@ export interface Occurrence {
 
 export interface RepeatGroup {
   text: string
-  common: boolean
   occurrences: Occurrence[]
 }
 

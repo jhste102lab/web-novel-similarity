@@ -4,12 +4,26 @@
 
 - 파일은 서버에 저장하지 않고 사용자의 브라우저에서만 처리됩니다. 서버, 로그인, 저장 기능이 없습니다.
 - 입력: `.txt`, `.docx`, `.hwpx`. (`.hwp`는 한글에서 `.hwpx`로 다시 저장해 주세요.)
-- 결과: 유사 구간 목록과 A/B 대조, 등급(거의 동일 · 일부 수정 · 부분 유사), 흔한 표현 표시, PDF/PNG 내보내기.
+- 결과: 겹치는 회차 쌍 목록과 A/B 대조, 등급(거의 동일 · 일부 수정), PDF/PNG 내보내기. 흔한 표현이나 약한 유사는 아예 보여주지 않습니다.
 - PC · 태블릿 기준. 모바일은 고려하지 않습니다.
 
-## 상태
+## 실행
 
-설계 단계입니다. 확정된 화면은 `docs/mockups/2026-09-21-similarity-check/index.html`을 브라우저로 열어 볼 수 있습니다. 아직 실행 가능한 앱은 없습니다.
+```sh
+npm install
+npm run dev     # 개발 서버
+npm run build   # 정적 빌드 (dist/)
+npm test        # 단위 테스트
+```
+
+원고 파일 두 개를 명령줄에서 바로 비교할 수도 있습니다.
+
+```sh
+node scripts/compare.ts A.txt B.txt   # A/B 비교
+node scripts/compare.ts A.txt         # 원고 하나 안의 반복
+```
+
+확정된 화면 시안은 `docs/mockups/2026-09-21-similarity-check/index.html`입니다.
 
 ## 문서
 

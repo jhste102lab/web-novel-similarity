@@ -1,15 +1,21 @@
 import {
-  NGRAM_SCORE_CAP,
+  MAX_PASSAGES_PER_MATCH,
+  MAX_RESULTS,
+  PROGRESS_EVERY,
   TIER_EDITED,
   TIER_NEAR,
-  TIER_PARTIAL,
-  PROGRESS_EVERY,
-  MAX_RESULTS,
 } from '../shared/constants.ts'
-import type { ChapterRange, CompareResult, ManuscriptText, Passage, Tier } from '../shared/types.ts'
+import type {
+  ChapterMatch,
+  ChapterRange,
+  CompareResult,
+  ManuscriptText,
+  Passage,
+  Tier,
+} from '../shared/types.ts'
 import { CandidateFinder } from './candidates.ts'
 import { commonPhrases, inRange } from './common.ts'
-import { pairScore } from './editDistance.ts'
+import { similarity } from './editDistance.ts'
 import { buildFingerprintIndex } from './fingerprints.ts'
 import { indexSentences, type SentenceIndex } from './sentences.ts'
 
@@ -21,14 +27,34 @@ export interface RunOptions {
 }
 
 export function tierOf(score: number): Tier {
-  return score >= TIER_NEAR ? 'near' : score >= TIER_EDITED ? 'edited' : 'partial'
+  return score >= TIER_NEAR ? 'near' : 'edited'
 }
 
-/** Matched sentence pair; `key` = i * stride + j lets passage chaining find the diagonal predecessor. */
+/** Matched sentence pair. */
 interface Pair {
   i: number
   j: number
   score: number
+}
+
+/** One diagonal run of matched pairs: a passage before its text is materialised. */
+interface Run {
+  i0: number
+  j0: number
+  i1: number
+  j1: number
+  sum: number
+  len: number
+  score: number
+}
+
+/** Chapter pair under construction; only the strongest runs keep a slot. */
+interface Group {
+  a: number | null
+  b: number | null
+  count: number
+  near: number
+  top: Run[]
 }
 
 export function compare(
@@ -50,61 +76,65 @@ export function compare(
     const cands = finder.find(fpA, i)
     for (let k = 0; k < cands.length; k += 2) {
       const j = cands[k]!
-      const score = pairScore(
-        idxA.norm[i]!,
-        idxB.norm[j]!,
-        cands[k + 1]!,
-        fpA.fpStart[i + 1]! - fpA.fpStart[i]!,
-        fpB.fpStart[j + 1]! - fpB.fpStart[j]!,
-        TIER_PARTIAL,
-        NGRAM_SCORE_CAP,
-      )
+      const score = similarity(idxA.norm[i]!, idxB.norm[j]!, TIER_EDITED)
       if (score > 0) pairs.push({ i, j, score })
     }
   }
+
   const common = commonPhrases([idxA, idxB])
-  const runs = chainRuns(pairs, idxB.norm.length + 1)
-  // Rounded percentage decides the tier so "90%" is never shown as a lower tier than 90 means.
-  for (const r of runs) r.score = Math.round((r.sum / r.len) * 100)
-  const kept = dedupeCommon(runs, idxA, common)
-  kept.sort((x, y) => y.score - x.score || x.i0 - y.i0)
+  const groups = new Map<string, Group>()
+  for (const r of chainRuns(pairs, idxB.norm.length + 1)) {
+    // A stock phrase matching somewhere else is not a suspicion.
+    if (r.len === 1 && common.has(idxA.norm[r.i0]!)) continue
+    // Rounded percentage decides the tier, so a 90% passage is never called 일부 수정.
+    r.score = Math.round((r.sum / r.len) * 100)
+    const ca = idxA.chapter[r.i0]!
+    const cb = idxB.chapter[r.j0]!
+    const key = `${ca}|${cb}`
+    let g = groups.get(key)
+    if (!g) {
+      g = { a: ca < 0 ? null : ca, b: cb < 0 ? null : cb, count: 0, near: 0, top: [] }
+      groups.set(key, g)
+    }
+    g.count++
+    if (r.score >= TIER_NEAR * 100) g.near++
+    keepStrongest(g.top, r)
+  }
+
+  const list = [...groups.values()]
+  list.sort((x, y) => y.near - x.near || y.count - x.count || (x.a ?? 0) - (y.a ?? 0))
   opts.onProgress?.(1)
   return {
     kind: 'compare',
-    total: kept.length,
-    passages: kept.slice(0, MAX_RESULTS).map((r) => ({
+    total: list.length,
+    matches: list.slice(0, MAX_RESULTS).map((g) => toMatch(g, idxA, idxB)),
+  }
+}
+
+function toMatch(g: Group, idxA: SentenceIndex, idxB: SentenceIndex): ChapterMatch {
+  g.top.sort((x, y) => x.i0 - y.i0)
+  return {
+    a: g.a,
+    b: g.b,
+    tier: g.near > 0 ? 'near' : 'edited',
+    count: g.count,
+    passages: g.top.map((r) => ({
       tier: tierOf(r.score / 100),
-      score: r.score,
-      common: r.common,
       a: span(idxA, r.i0, r.i1),
       b: span(idxB, r.j0, r.j1),
     })),
   }
 }
 
-/** A stock phrase matching in many places is listed once, not once per place pair. */
-function dedupeCommon(runs: Run[], idxA: SentenceIndex, common: Set<string>): Run[] {
-  const seen = new Set<string>()
-  return runs.filter((r) => {
-    const norm = idxA.norm[r.i0]!
-    r.common = r.len === 1 && common.has(norm)
-    if (!r.common) return true
-    if (seen.has(norm)) return false
-    seen.add(norm)
-    return true
-  })
-}
-
-/** One diagonal run of matched sentence pairs, before it is turned into a Passage. */
-interface Run {
-  i0: number
-  j0: number
-  i1: number
-  j1: number
-  sum: number
-  len: number
-  score: number
-  common: boolean
+/** Keeps at most MAX_PASSAGES_PER_MATCH runs, dropping the weakest when full. */
+function keepStrongest(top: Run[], r: Run): void {
+  if (top.length < MAX_PASSAGES_PER_MATCH) {
+    top.push(r)
+    return
+  }
+  let worst = 0
+  for (let i = 1; i < top.length; i++) if (top[i]!.score < top[worst]!.score) worst = i
+  if (r.score > top[worst]!.score) top[worst] = r
 }
 
 /** Joins pairs lying on one diagonal ((i,j) after (i-1,j-1)) into runs. */
@@ -116,16 +146,7 @@ function chainRuns(pairs: Pair[], stride: number): Run[] {
     const prev = runAt.get((p.i - 1) * stride + (p.j - 1))
     if (prev === undefined) {
       runAt.set(p.i * stride + p.j, runs.length)
-      runs.push({
-        i0: p.i,
-        j0: p.j,
-        i1: p.i,
-        j1: p.j,
-        sum: p.score,
-        len: 1,
-        score: 0,
-        common: false,
-      })
+      runs.push({ i0: p.i, j0: p.j, i1: p.i, j1: p.j, sum: p.score, len: 1, score: 0 })
     } else {
       const r = runs[prev]!
       r.i1 = p.i

@@ -34,7 +34,7 @@ describe('boundedEditDistance', () => {
 })
 
 describe('compare', () => {
-  it('reports identical, lightly edited and reordered sentences with the right tiers', () => {
+  it('tiers identical and lightly edited sentences and drops reordered ones', () => {
     const a = doc([
       [
         '그는 천천히 검을 뽑아 들었다.',
@@ -49,8 +49,8 @@ describe('compare', () => {
       ['누구도 먼저 입을 열지 않았고, 장로들은 서로 눈짓을 주고받았다.'],
     ])
     const r = compare(a, b)
-    const tiers = Object.fromEntries(r.passages.map((p) => [p.b.chapter, p.tier]))
-    expect(tiers).toEqual({ 2: 'near', 3: 'edited', 4: 'partial' })
+    const tiers = Object.fromEntries(r.matches.map((m) => [m.b, m.tier]))
+    expect(tiers).toEqual({ 2: 'near', 3: 'edited' })
   })
 
   it('chains consecutive matched sentences into one passage', () => {
@@ -60,15 +60,18 @@ describe('compare', () => {
       '세 번째 문장으로 끝난다.',
     ]
     const r = compare(doc([lines]), doc([['무관한 문장.', ...lines]]))
-    expect(r.passages).toHaveLength(1)
-    expect(r.passages[0]!.a.text).toBe(lines.join('\n'))
+    expect(r.matches).toHaveLength(1)
+    expect(r.matches[0]!.count).toBe(1)
+    expect(r.matches[0]!.passages[0]!.a.text).toBe(lines.join('\n'))
   })
 
   it('honours the chapter range', () => {
     const a = doc([['범위 밖의 문장이 있다.'], ['범위 안의 문장이 있다.']])
     const b = doc([['범위 밖의 문장이 있다.', '범위 안의 문장이 있다.']])
     const r = compare(a, b, { rangeA: [2, 2] })
-    expect(r.passages.map((p) => p.a.text)).toEqual(['범위 안의 문장이 있다.'])
+    expect(r.matches.flatMap((m) => m.passages.map((p) => p.a.text))).toEqual([
+      '범위 안의 문장이 있다.',
+    ])
   })
 })
 describe('findRepeats', () => {

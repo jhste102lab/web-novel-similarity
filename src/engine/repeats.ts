@@ -52,9 +52,10 @@ export function findRepeats(a: ManuscriptText, opts: RunOptions = {}): RepeatRes
       if (kept.length === 0 || id - kept[kept.length - 1]! > REPEAT_MIN_GAP) kept.push(id)
     if (kept.length < 2) continue
     const first = kept[0]!
+    // A stock phrase recurring across chapters is a habit, not a suspicion.
+    if (common.has(idx.norm[first]!)) continue
     groups.push({
       text: sentenceText(idx, first),
-      common: common.has(idx.norm[first]!),
       occurrences: kept.map((id) => ({
         chapter: idx.chapter[id]! < 0 ? null : idx.chapter[id]!,
         sentenceIndex: idx.ordinal[id]!,
