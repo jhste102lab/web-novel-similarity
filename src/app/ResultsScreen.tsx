@@ -111,7 +111,7 @@ function CopyButton({ a, b }: { a: string; b?: string }) {
   const [done, setDone] = useState(false)
   return (
     <button
-      className="copy"
+      className={`copy ${done ? 'done' : ''}`}
       onClick={() => {
         const text = b ? `A: ${a}\n\nB: ${b}` : a
         void copyText(text).then(() => {
@@ -120,7 +120,7 @@ function CopyButton({ a, b }: { a: string; b?: string }) {
         })
       }}
     >
-      {done ? '복사됨' : '복사'}
+      {done ? '✓ 복사 완료' : '문장 복사'}
     </button>
   )
 }

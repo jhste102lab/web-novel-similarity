@@ -865,6 +865,10 @@ button {
   line-height: 1.9;
 }
 .pane .k {
+  display: flex;
+  white-space: normal;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   color: var(--meta);
   font-weight: 600;
@@ -1103,16 +1107,8 @@ mark {
 .results:focus {
   outline: none;
 }
-.pane .k .copy {
-  float: right;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--meta);
-  padding: 0 6px;
-  border-radius: 6px;
-}
-.detail .head .copy {
-  margin-left: 12px;
+.copy {
+  margin-left: auto;
   align-self: center;
   font-size: 12px;
   font-weight: 600;
@@ -1120,11 +1116,16 @@ mark {
   padding: 2px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
+  white-space: nowrap;
 }
-.pane .k .copy:hover,
-.detail .head .copy:hover {
+.copy:hover {
   background: var(--muted);
   color: var(--fg);
+}
+.copy.done {
+  color: #15803d;
+  border-color: #86efac;
+  background: #f0fdf4;
 }
 .analyzing .elapsed {
   color: var(--meta);
