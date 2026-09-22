@@ -22,7 +22,17 @@ type Key = 'A' | 'B'
 type Screen =
   | { kind: 'start' }
   | { kind: 'analyzing'; run: Run<CompareResult | RepeatResult>; pct: number; two: boolean }
-  | { kind: 'results'; result: CompareResult | RepeatResult; a: Slot; b: Slot | null }
+  | {
+      kind: 'results'
+      result: CompareResult | RepeatResult
+      a: Slot
+      b: Slot | null
+      /** Set while findings are still streaming in; null once the run finished. */
+      run: Run<CompareResult | RepeatResult> | null
+      pct: number
+      /** True when the user stopped the run, so the findings are only what was scanned. */
+      stopped?: boolean
+    }
 
 const REPO = 'https://github.com/jhste102lab/web-novel-similarity'
 const HWP_MESSAGE = 'hwp는 열 수 없어요. 한글에서 hwpx로 저장해 주세요.'
@@ -66,7 +76,16 @@ export function App() {
     if (two && !b) return
     const range = (s: Slot) => (s.range && slotBounds(s) ? s.range : undefined)
     const onProgress = (pct: number): void =>
-      setScreen((s) => (s.kind === 'analyzing' ? { ...s, pct } : s))
+      setScreen((s) => (s.kind === 'analyzing' || s.kind === 'results' ? { ...s, pct } : s))
+    // The first findings replace the progress screen, so review starts before the scan ends.
+    const onPartial = (result: CompareResult | RepeatResult): void =>
+      setScreen((s) =>
+        s.kind === 'analyzing'
+          ? { kind: 'results', result, a, b, run: s.run, pct: s.pct }
+          : s.kind === 'results' && s.run
+            ? { ...s, result }
+            : s,
+      )
     const run = b
       ? runInWorker<CompareResult>(
           {
@@ -77,22 +96,29 @@ export function App() {
             rangeB: range(b),
           },
           onProgress,
+          onPartial,
         )
       : runInWorker<RepeatResult>(
           { type: 'repeat', a: slotEngineText(a), rangeA: range(a) },
           onProgress,
+          onPartial,
         )
     setRunError(null)
+    setFilter('all')
+    setSelected(0)
     setScreen({ kind: 'analyzing', run, pct: 0, two: b !== null })
     run.result.then(
-      (result) => {
-        setFilter('all')
-        setSelected(0)
-        setScreen({ kind: 'results', result, a, b })
-      },
+      (result) => setScreen({ kind: 'results', result, a, b, run: null, pct: 1 }),
       (err: unknown) => {
-        // Aborting rejects too; only a real failure needs a message.
-        if (!run.aborted) setRunError(`검사를 끝내지 못했어요. ${String(err)}`)
+        // Aborting rejects too. Findings already streamed in stay on screen; only a real
+        // failure, or an abort before the first finding, goes back to the start.
+        if (run.aborted) {
+          setScreen((s) =>
+            s.kind === 'results' ? { ...s, run: null, stopped: true } : { kind: 'start' },
+          )
+          return
+        }
+        setRunError(`검사를 끝내지 못했어요. ${String(err)}`)
         setScreen({ kind: 'start' })
       },
     )
@@ -121,7 +147,18 @@ export function App() {
           </a>
         </div>
         <div className="r">
-          {results && (
+          {results?.run && (
+            <>
+              <span className="scanning">
+                검사 중 {Math.round(results.pct * 100)}%
+                <i style={{ width: `${Math.round(results.pct * 100)}%` }} />
+              </span>
+              <button className="btn text" onClick={() => results.run?.abort()}>
+                중단
+              </button>
+            </>
+          )}
+          {results && !results.run && (
             <>
               <button
                 className="btn text"
@@ -183,6 +220,8 @@ export function App() {
             titleA={results.a.title}
             titleB={results.b?.title ?? ''}
             rangeNote={rangeNote(results.a, results.b)}
+            running={results.run !== null}
+            stopped={results.stopped ?? false}
             filter={filter as CompareFilter}
             onFilter={(f) => {
               setFilter(f)
@@ -196,6 +235,8 @@ export function App() {
           <RepeatView
             result={results.result}
             titleA={results.a.title}
+            running={results.run !== null}
+            stopped={results.stopped ?? false}
             filter={filter as RepeatFilter}
             onFilter={(f) => {
               setFilter(f)

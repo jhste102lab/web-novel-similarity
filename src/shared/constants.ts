@@ -30,6 +30,12 @@ export const REPEAT_MIN_GAP = 3
 /** Progress is reported after this many query sentences. */
 export const PROGRESS_EVERY = 500
 
+/** Findings stream to the UI at most this often; below ~250ms the regrouping cost shows up. */
+export const PARTIAL_EVERY_MS = 400
+
+/** Dotplot cells kept; a 500×500 chapter map never fills, and the canvas is 1 px per cell. */
+export const MAX_GRID_CELLS = 40000
+
 /** A report is reviewed by a human; beyond this the strongest findings are kept and the rest
  * are only counted. Uncapped results reached ~600k passages (multi-GB DOM) on 2M-char pairs. */
 export const MAX_RESULTS = 3000

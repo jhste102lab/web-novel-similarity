@@ -16,8 +16,17 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   try {
     const result =
       req.type === 'compare'
-        ? compare(req.a, req.b, { rangeA: req.rangeA, rangeB: req.rangeB, onProgress })
-        : findRepeats(req.a, { rangeA: req.rangeA, onProgress })
+        ? compare(req.a, req.b, {
+            rangeA: req.rangeA,
+            rangeB: req.rangeB,
+            onProgress,
+            onPartial: (partial) => post({ type: 'partial', result: partial }),
+          })
+        : findRepeats(req.a, {
+            rangeA: req.rangeA,
+            onProgress,
+            onPartial: (partial) => post({ type: 'partial', result: partial }),
+          })
     post({ type: 'result', result })
   } catch (err) {
     post({ type: 'error', message: err instanceof Error ? err.message : String(err) })

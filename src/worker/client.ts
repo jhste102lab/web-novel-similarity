@@ -13,12 +13,14 @@ export interface Run<T> {
 export function runInWorker<T extends CompareResult | RepeatResult>(
   request: WorkerRequest,
   onProgress: (pct: number) => void,
+  onPartial: (result: T) => void,
 ): Run<T> {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
   const { promise, resolve, reject } = Promise.withResolvers<T>()
   worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
     const msg = e.data
     if (msg.type === 'progress') onProgress(msg.pct)
+    else if (msg.type === 'partial') onPartial(msg.result as T)
     else if (msg.type === 'result') {
       resolve(msg.result as T)
       worker.terminate()

@@ -55,11 +55,52 @@ export interface ChapterMatch {
   passages: Passage[]
 }
 
+/** Where the run spent its time and how much work the fingerprint index avoided. */
+export interface RunStats {
+  /** Milliseconds per phase; `total` also covers the parts not broken out. */
+  indexMs: number
+  fingerprintMs: number
+  scanMs: number
+  groupMs: number
+  totalMs: number
+  chars: number
+  sentencesA: number
+  sentencesB: number
+  /** Sentence pairs a naive all-pairs comparison would score. */
+  pairsNaive: number
+  /** Sentence pairs the fingerprint index actually scored. */
+  pairsScored: number
+}
+
+/** One cell of the chapter × chapter density map. */
+export interface GridCell {
+  a: number
+  b: number
+  count: number
+  near: number
+}
+
+/**
+ * Chapter × chapter density behind the dotplot. Unlike `matches` this covers every
+ * chapter pair found, including those the MAX_RESULTS cap drops from the list.
+ */
+export interface Grid {
+  cells: GridCell[]
+  aMin: number
+  aMax: number
+  bMin: number
+  bMax: number
+  /** True when the cell cap dropped the sparsest cells. */
+  truncated: boolean
+}
+
 export interface CompareResult {
   kind: 'compare'
   matches: ChapterMatch[]
   /** Chapter pairs found before the MAX_RESULTS cap. */
   total: number
+  grid: Grid | null
+  stats: RunStats
 }
 
 export interface Occurrence {
@@ -77,6 +118,9 @@ export interface RepeatResult {
   groups: RepeatGroup[]
   /** Groups found before the MAX_RESULTS cap. */
   total: number
+  /** Chapters that share a repeated sentence; symmetric, so only a ≤ b cells exist. */
+  grid: Grid | null
+  stats: RunStats
 }
 
 export type DiffOp = { op: 'eq' | 'ins' | 'del'; text: string }

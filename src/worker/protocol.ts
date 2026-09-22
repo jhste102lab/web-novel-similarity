@@ -12,5 +12,7 @@ export type WorkerRequest =
 
 export type WorkerResponse =
   | { type: 'progress'; pct: number }
+  /** Findings so far; sent repeatedly while the scan runs. */
+  | { type: 'partial'; result: CompareResult | RepeatResult }
   | { type: 'result'; result: CompareResult | RepeatResult }
   | { type: 'error'; message: string }
