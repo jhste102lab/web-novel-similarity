@@ -330,8 +330,8 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
               <div className="detail" key={rows.indexOf(g)}>
                 <div className="head">
                   <span className="pct">{g.occurrences.length}회</span>
-                  <span className="where">{span(g)}</span>
                   <CopyButton a={g.text} />
+                  <span className="where">{span(g)}</span>
                 </div>
                 {g.occurrences.slice(0, MAX_OCCURRENCES).map((o, i) => (
                   <div key={i} className="occ">

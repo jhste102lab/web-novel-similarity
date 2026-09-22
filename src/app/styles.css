@@ -832,6 +832,10 @@ button {
   color: var(--meta);
   margin-left: auto;
 }
+/* In the repeat header the copy button sits beside the count, so the span keeps the right edge. */
+.detail .head .copy {
+  margin-left: 0;
+}
 .tag {
   font-size: 12px;
   font-weight: 600;
@@ -1109,6 +1113,7 @@ mark {
 }
 .copy {
   margin-left: auto;
+  flex: none;
   align-self: center;
   font-size: 12px;
   font-weight: 600;
