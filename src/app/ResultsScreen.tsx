@@ -65,6 +65,9 @@ function Tab<F>({
     </button>
   )
 }
+function EmptyResults({ children }: { children: React.ReactNode }) {
+  return <div className="empty-results">{children}</div>
+}
 
 export function CompareView({
   result,
@@ -116,23 +119,29 @@ export function CompareView({
         </div>
       </div>
       <div className="split">
-        <div className="list">
-          {rows.map((q, i) => (
-            <div key={i} className={`item ${q === m ? 'on' : ''}`} onClick={() => onSelect(i)}>
-              <i className={`dot ${TIER_CLASS[q.tier]}`} />
-              <div className="b">
-                <div className="pos">
-                  <span style={{ color: 'inherit', margin: 0 }}>
-                    A {chapterLabel(q.a)} ↔ B {chapterLabel(q.b)}
-                  </span>
-                  <span>유사 문장 {q.count}개</span>
+        {rows.length === 0 ? (
+          <EmptyResults>의심되는 유사 문장이 없습니다.</EmptyResults>
+        ) : (
+          <>
+            <div className="list">
+              {rows.map((q, i) => (
+                <div key={i} className={`item ${q === m ? 'on' : ''}`} onClick={() => onSelect(i)}>
+                  <i className={`dot ${TIER_CLASS[q.tier]}`} />
+                  <div className="b">
+                    <div className="pos">
+                      <span style={{ color: 'inherit', margin: 0 }}>
+                        A {chapterLabel(q.a)} ↔ B {chapterLabel(q.b)}
+                      </span>
+                      <span>유사 문장 {q.count}개</span>
+                    </div>
+                    <div className="ex">{firstLine(q.passages[0]!.a)}</div>
+                  </div>
                 </div>
-                <div className="ex">{firstLine(q.passages[0]!.a)}</div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-        {m && <MatchDetail m={m} />}
+            {m && <MatchDetail m={m} />}
+          </>
+        )}
       </div>
     </div>
   )
@@ -200,39 +209,45 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
         </div>
       </div>
       <div className="split">
-        <div className="list">
-          {rows.map((q, i) => (
-            <div key={i} className={`item ${q === g ? 'on' : ''}`} onClick={() => onSelect(i)}>
-              <i className="dot t2" />
-              <div className="b">
-                <div className="pos">
-                  <span style={{ color: 'inherit', margin: 0 }}>{q.occurrences.length}회</span>
-                  <span>{span(q)}</span>
+        {rows.length === 0 ? (
+          <EmptyResults>의심되는 반복 문장이 없습니다.</EmptyResults>
+        ) : (
+          <>
+            <div className="list">
+              {rows.map((q, i) => (
+                <div key={i} className={`item ${q === g ? 'on' : ''}`} onClick={() => onSelect(i)}>
+                  <i className="dot t2" />
+                  <div className="b">
+                    <div className="pos">
+                      <span style={{ color: 'inherit', margin: 0 }}>{q.occurrences.length}회</span>
+                      <span>{span(q)}</span>
+                    </div>
+                    <div className="ex">{q.text}</div>
+                  </div>
                 </div>
-                <div className="ex">{q.text}</div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-        {g && (
-          <div className="detail">
-            <div className="head">
-              <span className="pct">{g.occurrences.length}회</span>
-              <span className="where">{span(g)}</span>
-            </div>
-            {g.occurrences.slice(0, MAX_OCCURRENCES).map((o, i) => (
-              <div key={i} className="occ">
-                <span className="ch">{where(o)}</span>
-                <span>{g.text}</span>
-              </div>
-            ))}
-            {g.occurrences.length > MAX_OCCURRENCES && (
-              <div className="occ">
-                <span className="ch">…</span>
-                <span>외 {(g.occurrences.length - MAX_OCCURRENCES).toLocaleString()}곳</span>
+            {g && (
+              <div className="detail">
+                <div className="head">
+                  <span className="pct">{g.occurrences.length}회</span>
+                  <span className="where">{span(g)}</span>
+                </div>
+                {g.occurrences.slice(0, MAX_OCCURRENCES).map((o, i) => (
+                  <div key={i} className="occ">
+                    <span className="ch">{where(o)}</span>
+                    <span>{g.text}</span>
+                  </div>
+                ))}
+                {g.occurrences.length > MAX_OCCURRENCES && (
+                  <div className="occ">
+                    <span className="ch">…</span>
+                    <span>외 {(g.occurrences.length - MAX_OCCURRENCES).toLocaleString()}곳</span>
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>
