@@ -18,14 +18,15 @@ text goes to the worker.
 
 ## Module map
 
-| Path           | Role                                                                                |
-| -------------- | ----------------------------------------------------------------------------------- |
-| `src/parsers/` | bytes → text, chapter detection, `Manuscript` assembly                              |
-| `src/engine/`  | sentence index, fingerprints, candidate retrieval, edit distance, compare, repeats  |
-| `src/worker/`  | `protocol.ts` message types, `worker.ts` entry, `client.ts` `runInWorker`           |
-| `src/app/`     | React screens (start / analyzing / results), slot state, range slider, export modal |
-| `src/export/`  | printable report components and PNG/PDF saving                                      |
-| `src/shared/`  | `types.ts` (data contracts), `constants.ts` (every tunable)                         |
+| Path           | Role                                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------- |
+| `src/parsers/` | bytes → text, chapter detection, `Manuscript` assembly                                               |
+| `src/engine/`  | sentence index, fingerprints, candidate retrieval, edit distance, compare, repeats                   |
+| `src/worker/`  | `protocol.ts` message types, `worker.ts` entry, `client.ts` `runInWorker`                            |
+| `src/app/`     | React screens (start / analyzing / results), slot state, range slider, export modal, dotplot, panels |
+| `src/export/`  | printable report components and PNG/PDF saving                                                       |
+| `src/shared/`  | `types.ts` (data contracts), `constants.ts` (every tunable)                                          |
+| `public/sw.js` | offline cache; the build injects this build's file names (`scripts/sw-precache.ts`)                  |
 
 ## Pipeline
 
@@ -39,11 +40,14 @@ text goes to the worker.
 8. **Chapter grouping** — passages are grouped by (chapter of A, chapter of B). One `ChapterMatch` = one row in the UI: tier (`near` when any of its passages is 거의 동일, from the _rounded_ percentage), `count` of suspicious passages, and the strongest `MAX_PASSAGES_PER_MATCH` of them in reading order. Scores exist only inside the engine; they are never shown, because the ratio is not calibrated against any external notion of copying.
 9. **Repeats** — `engine/repeats.ts`: union-find over near-duplicate sentence pairs inside one manuscript; occurrences closer than `REPEAT_MIN_GAP` sentences count once.
 10. **Result cap** — chapter pairs are sorted by 거의 동일 count, then passage count, and cut to `MAX_RESULTS`; `total` carries the uncapped count and the UI says how many were hidden.
-11. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened; 1-char equal islands are folded into the surrounding change.
+11. **Streaming** — every `PARTIAL_EVERY_MS` the scan regroups the pairs found so far and posts them as a `partial` response. The UI leaves the progress screen at the first partial, so review starts about a second into a 2M-char run instead of after it. Stopping keeps what was scanned.
+12. **Chapter map** — `buildGrid` emits one cell per chapter pair, **including pairs the `MAX_RESULTS` cap drops from the list**, for the dotplot. 내부 반복 builds the same shape from chapter pairs that share a repeated sentence.
+13. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened; 1-char equal islands are folded into the surrounding change.
 
 Scale target: 500 chapters × 4,000 chars per side (≈ 2M chars), ≤ 5 s.
-Measured: ~1.5–1.7 s in Node and ~7 s end to end in Chrome including parsing
-and rendering (`docs/plan/2026-09-21-benchmark.md`).
+Measured: ~1.5–1.7 s in Node and ~3.6 s end to end in Chrome including parsing
+and rendering, with the first findings on screen after ~0.8 s
+(`docs/plan/2026-09-21-benchmark.md`).
 
 ## Worker protocol
 
@@ -61,6 +65,7 @@ export type WorkerRequest =
 
 export type WorkerResponse =
   | { type: 'progress'; pct: number }
+  | { type: 'partial'; result: CompareResult | RepeatResult } // findings so far, repeatedly
   | { type: 'result'; result: CompareResult | RepeatResult }
   | { type: 'error'; message: string }
 ```
@@ -94,6 +99,8 @@ interface CompareResult {
   kind: 'compare'
   matches: ChapterMatch[]
   total: number // chapter pairs before the MAX_RESULTS cap
+  grid: Grid | null // every chapter pair, capped and filtered, for the dotplot
+  stats: RunStats // phase timings, sentence counts, pairs scored vs. pairs possible
 }
 interface RepeatGroup {
   text: string
@@ -103,6 +110,8 @@ interface RepeatResult {
   kind: 'repeat'
   groups: RepeatGroup[]
   total: number
+  grid: Grid | null
+  stats: RunStats
 }
 ```
 
@@ -118,18 +127,39 @@ All in `src/shared/constants.ts`; rationale in
 
 | Constant                                   | Meaning                                  | Value                 |
 | ------------------------------------------ | ---------------------------------------- | --------------------- |
+| `MIN_SENTENCE_CHARS`                       | shorter sentences are not indexed        | 8                     |
 | `NGRAM`                                    | fingerprint n-gram length                | 5                     |
 | `WINDOW`                                   | winnowing window                         | 4                     |
 | `MIN_SHARED_FINGERPRINTS`                  | candidate cut                            | 1                     |
-| `MAX_POSTINGS`                             | fingerprint dropped above this           | 2,000                 |
+| `MAX_POSTINGS`                             | fingerprint dropped above this           | 400                   |
+| `MAX_CANDIDATES_PER_SENTENCE`              | candidates scored per query sentence     | 16                    |
 | `TIER_NEAR`                                | score ≥ → 거의 동일                      | 0.90                  |
-| `TIER_EDITED`                              | score ≥ → 일부 수정                      | 0.62                  |
-| `TIER_PARTIAL`                             | score ≥ → 부분 유사; below → dropped     | 0.45                  |
-| `NGRAM_SCORE_CAP`                          | ceiling for n-gram-only evidence         | `TIER_EDITED` − 0.01  |
-| `COMMON_MAX_CHARS` / `COMMON_MIN_CHAPTERS` | 흔한 표현 tag                            | 14 chars / 4 chapters |
-| `REPEAT_MIN_GAP`                           | 내부 반복 occurrences must be this apart | 1 sentence            |
+| `TIER_EDITED`                              | score ≥ → 일부 수정; below → dropped     | 0.62                  |
+| `COMMON_MAX_CHARS` / `COMMON_MIN_CHAPTERS` | 흔한 표현, dropped                       | 14 chars / 4 chapters |
+| `REPEAT_MIN_GAP`                           | 내부 반복 occurrences must be this apart | 3 sentences           |
 | `MAX_RESULTS`                              | findings kept for display                | 3,000                 |
+| `MAX_PASSAGES_PER_MATCH`                   | passages kept per chapter pair           | 20                    |
+| `MAX_GRID_CELLS`                           | dotplot cells kept                       | 40,000                |
 | `PROGRESS_EVERY`                           | progress tick, in query sentences        | 500                   |
+| `PARTIAL_EVERY_MS`                         | streaming snapshot cadence               | 400 ms                |
+
+## Result review
+
+The two result views share `ResultsShell` in `src/app/ResultsScreen.tsx`:
+
+- **Windowed list** — rows are a fixed 75 px (`.item` in `styles.css`, `ROW_H` in the view), so 3,000 findings render as ~20 nodes.
+- **Keyboard** — `j`/`k`/arrows, `g`/`G`, `/` to search, `c` to copy, `m` for the map, `d` for diagnostics, `?` for the sheet.
+- **Dotplot** (`src/app/Dotplot.tsx`) — chapter × chapter canvas, opacity by density on a √ scale, red where a pair contains 거의 동일; clicking a dot selects that chapter pair, and says so when the pair is outside the current list.
+- **Diagnostics** (`src/app/Panels.tsx`) — phase timings plus `pairsScored / pairsNaive`, which is what the fingerprint index buys: 0.014 % on a 2M × 2M-char run.
+
+## Offline
+
+`public/sw.js` caches the shell and this build's JS/CSS at install, then every
+same-origin GET as it is requested, cache-first with a background refresh.
+Asset names are content-hashed, so a stale entry is never wrong; a new build
+installs a new worker and `skipWaiting` + `clients.claim` hand over at once.
+The point is verification, not speed: pulling the network and reloading proves
+the "nothing is uploaded" claim.
 
 ## Export
 
