@@ -36,17 +36,13 @@ False positives (reported passages that were not planted): 0.
 
 A 2,011,184 chars, B 2,010,687 chars, 168,083 chapter pairs, 1356 ms (Node v26.9.0).
 
-## Real manuscripts (local, not committed)
+## Private local validation
 
-Three `.txt` files supplied by the owner, read with the title-line chapter rule (`#N화`).
-
-| Run                                                                             | Result                                                             |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Self-repeat, manuscript flagged as heavily repetitive (156k chars, 38 chapters) | 78 repeat groups, largest 48 occurrences of one sentence, ~250 ms  |
-| Self-repeat, two ordinary manuscripts (139k / 87k chars)                        | 19 and 11 groups, all ≤ 4 occurrences, ~30 ms                      |
-| A/B of the two ordinary manuscripts (unrelated works)                           | **0 chapter pairs** (9 false positives before the 0.62 floor)      |
-| A/B of the repetitive manuscript vs an ordinary one                             | 0 chapter pairs                                                    |
-| A/B of a manuscript vs a script-mutated copy of itself                          | 53 chapter pairs (23 거의 동일, 30 일부 수정), 421 passages, 44 ms |
+Real manuscripts were used locally only to check false positives and repeat
+behaviour. No text, title, filename, path, length, hash, fingerprint, diff, or
+per-manuscript result is recorded here. Cross-comparisons among known-unrelated
+works produced no findings after the 0.62 floor; locally generated edited
+copies confirmed that real similarities are still detected and grouped.
 
 ## Decisions
 
@@ -62,8 +58,9 @@ Three `.txt` files supplied by the owner, read with the title-line chapter rule 
   kept inside the engine and used only for tiering and sorting.
 - **흔한 표현 is dropped, not tagged.** A stock sentence (≤ 14 chars, ≥ 4 chapters)
   matching elsewhere is not a suspicion, in either mode.
-- **Results are grouped by chapter pair.** Sentence-level rows reached hundreds of
-  entries for one copied work; the same finding is 53 chapter-pair rows.
+- **Results are grouped by chapter pair.** Sentence-level output can reach
+  hundreds of entries for one copied work; grouping reduces it to reviewable
+  chapter-pair rows.
 - `MIN_SHARED_FINGERPRINTS = 1`: short sentences (≤ 15 chars) with one typo share
   only one fingerprint; requiring two lost them. Performance stayed within target.
 
