@@ -61,6 +61,7 @@ interface Group {
   b: number | null
   count: number
   near: number
+  runs: number
   top: Run[]
 }
 
@@ -152,7 +153,7 @@ function buildResult(
   stats: RunStats,
 ): CompareResult {
   const groups = new Map<string, Group>()
-  for (const r of chainRuns(pairs, idxB.norm.length + 1)) {
+  for (const r of chainRuns(pairs, idxA, idxB)) {
     // A stock phrase matching somewhere else is not a suspicion.
     if (r.len === 1 && common.has(idxA.norm[r.i0]!)) continue
     // Rounded percentage decides the tier, so a 90% passage is never called 일부 수정.
@@ -162,11 +163,13 @@ function buildResult(
     const key = `${ca}|${cb}`
     let g = groups.get(key)
     if (!g) {
-      g = { a: ca < 0 ? null : ca, b: cb < 0 ? null : cb, count: 0, near: 0, top: [] }
+      g = { a: ca < 0 ? null : ca, b: cb < 0 ? null : cb, count: 0, near: 0, runs: 0, top: [] }
       groups.set(key, g)
     }
-    g.count++
-    if (r.score >= TIER_NEAR * 100) g.near++
+    // Sentences, not runs: a chapter copied whole is one run but the row must say 45 문장.
+    g.count += r.len
+    g.runs++
+    if (r.score >= TIER_NEAR * 100) g.near += r.len
     keepStrongest(g.top, r)
   }
 
@@ -214,6 +217,7 @@ function toMatch(g: Group, idxA: SentenceIndex, idxB: SentenceIndex): ChapterMat
     b: g.b,
     tier: g.near > 0 ? 'near' : 'edited',
     count: g.count,
+    runs: g.runs,
     passages: g.top.map((r) => ({
       tier: tierOf(r.score / 100),
       a: span(idxA, r.i0, r.i1),
@@ -233,13 +237,24 @@ function keepStrongest(top: Run[], r: Run): void {
   if (r.score > top[worst]!.score) top[worst] = r
 }
 
-/** Joins pairs lying on one diagonal ((i,j) after (i-1,j-1)) into runs. */
-function chainRuns(pairs: Pair[], stride: number): Run[] {
+/**
+ * Joins pairs lying on one diagonal ((i,j) after (i-1,j-1)) into runs. A run never crosses a
+ * chapter boundary on either side: a manuscript copied wholesale is one unbroken diagonal, and
+ * without the break it would collapse into a single finding instead of one per chapter pair.
+ */
+function chainRuns(pairs: Pair[], idxA: SentenceIndex, idxB: SentenceIndex): Run[] {
+  const stride = idxB.norm.length + 1
   pairs.sort((x, y) => x.i - y.i || x.j - y.j)
   const runs: Run[] = []
   const runAt = new Map<number, number>()
   for (const p of pairs) {
-    const prev = runAt.get((p.i - 1) * stride + (p.j - 1))
+    const at = runAt.get((p.i - 1) * stride + (p.j - 1))
+    const prev =
+      at !== undefined &&
+      idxA.chapter[p.i] === idxA.chapter[runs[at]!.i0] &&
+      idxB.chapter[p.j] === idxB.chapter[runs[at]!.j0]
+        ? at
+        : undefined
     if (prev === undefined) {
       runAt.set(p.i * stride + p.j, runs.length)
       runs.push({ i0: p.i, j0: p.j, i1: p.i, j1: p.j, sum: p.score, len: 1, score: 0 })

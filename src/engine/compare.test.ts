@@ -61,8 +61,23 @@ describe('compare', () => {
     ]
     const r = compare(doc([lines]), doc([['무관한 문장.', ...lines]]))
     expect(r.matches).toHaveLength(1)
-    expect(r.matches[0]!.count).toBe(1)
+    expect(r.matches[0]!.passages).toHaveLength(1)
+    expect(r.matches[0]!.count).toBe(lines.length)
     expect(r.matches[0]!.passages[0]!.a.text).toBe(lines.join('\n'))
+  })
+
+  it('splits a copied run at chapter boundaries so each chapter pair is its own finding', () => {
+    const first = ['성문 앞에서 말을 세우고 기다렸다.', '북소리가 세 번 울린 뒤에야 문이 열렸다.']
+    const second = [
+      '약재상은 저울추를 내려놓으며 한숨을 쉬었다.',
+      '장부의 마지막 줄은 비어 있었다.',
+    ]
+    // B is A copied whole, so the matched sentences form one unbroken diagonal.
+    const r = compare(doc([first, second]), doc([first, second]))
+    expect(r.matches.map((m) => [m.a, m.b, m.count])).toEqual([
+      [1, 1, 2],
+      [2, 2, 2],
+    ])
   })
 
   it('honours the chapter range', () => {

@@ -428,8 +428,8 @@ function MatchDetail({ m }: { m: ChapterMatch }) {
         </span>
         <span className="tier">{TIER_LABEL[m.tier]}</span>
         <span className="where">
-          유사 문장 {m.count}개
-          {m.count > m.passages.length && ` · 상위 ${m.passages.length}개 표시`}
+          유사 문장 {m.count}개 · 구간 {m.runs}개
+          {m.runs > m.passages.length && ` (상위 ${m.passages.length}개 표시)`}
         </span>
       </div>
       {m.passages.map((p, i) => (

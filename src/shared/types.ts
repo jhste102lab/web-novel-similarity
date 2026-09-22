@@ -50,8 +50,10 @@ export interface ChapterMatch {
   b: number | null
   /** 'near' when at least one passage is 거의 동일. */
   tier: Tier
-  /** Suspicious passages in this chapter pair, including those beyond MAX_PASSAGES_PER_MATCH. */
+  /** Suspicious sentences in this chapter pair, including those not shown. */
   count: number
+  /** Passages (diagonal runs) found, including those beyond MAX_PASSAGES_PER_MATCH. */
+  runs: number
   passages: Passage[]
 }
 

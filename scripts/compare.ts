@@ -30,17 +30,19 @@ if (files.length === 1) {
   }
 } else {
   const r = compare(load(files[0]!), load(files[1]!))
-  const counts = { near: 0, edited: 0, passages: 0 }
+  const counts = { near: 0, edited: 0, sentences: 0 }
   for (const m of r.matches) {
     counts[m.tier]++
-    counts.passages += m.count
+    counts.sentences += m.count
   }
   console.log(
-    `\n${r.matches.length} chapter pairs (${counts.passages} passages) in ${Math.round(performance.now() - t0)} ms`,
+    `\n${r.matches.length} chapter pairs (${counts.sentences} sentences) in ${Math.round(performance.now() - t0)} ms`,
     counts,
   )
   for (const m of r.matches.slice(0, limit)) {
-    console.log(`  ${m.tier}  A ${m.a}화 ↔ B ${m.b}화  · ${m.count} passages`)
+    console.log(
+      `  ${m.tier}  A ${m.a}화 ↔ B ${m.b}화  · ${m.count} sentences in ${m.runs} passages`,
+    )
     for (const p of m.passages.slice(0, 2)) {
       console.log(`    A: ${p.a.text.slice(0, 80)}`)
       console.log(`    B: ${p.b.text.slice(0, 80)}`)

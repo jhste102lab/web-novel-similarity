@@ -35,7 +35,7 @@ text goes to the worker.
 3. **Sentence index** — `engine/sentences.ts`: split on Korean sentence enders and newlines; per sentence keep start/end offsets, chapter, in-chapter ordinal, and an NFC letters-only normalised form, in typed arrays.
 4. **Candidate retrieval** — `engine/fingerprints.ts`: Rabin–Karp rolling hashes over `NGRAM`-char windows, winnowed with window `WINDOW`, inverted index over side B (over A itself in 내부 반복); fingerprints occurring in more than `MAX_POSTINGS` sentences are dropped as non-discriminative. `engine/candidates.ts` returns sentences sharing ≥ `MIN_SHARED_FINGERPRINTS` fingerprints.
 5. **Precise compare** — `engine/editDistance.ts`: Ukkonen-banded Levenshtein on the normalised sentences → ratio. Pairs below `TIER_EDITED` are discarded, so nothing weaker than 일부 수정 is ever reported. There is no n-gram-only fallback: it only produced hits in the old 부분 유사 band, which was pure noise on unrelated manuscripts.
-6. **Passage chaining** — `engine/compare.ts`: pairs on one diagonal ((i,j) after (i−1,j−1)) become one passage; score = mean of member scores.
+6. **Passage chaining** — `engine/compare.ts`: pairs on one diagonal ((i,j) after (i−1,j−1)) become one passage; score = mean of member scores. **A run stops at a chapter boundary on either side**: a manuscript copied wholesale is one unbroken diagonal, and without the break every copied chapter collapsed into a single finding.
 7. **Noise removal** — a one-sentence passage whose text is a 흔한 표현 (`engine/common.ts`: ≤ `COMMON_MAX_CHARS` chars, appearing in ≥ `COMMON_MIN_CHAPTERS` chapters) is dropped, not tagged. The same rule drops 흔한 표현 groups in 내부 반복.
 8. **Chapter grouping** — passages are grouped by (chapter of A, chapter of B). One `ChapterMatch` = one row in the UI: tier (`near` when any of its passages is 거의 동일, from the _rounded_ percentage), `count` of suspicious passages, and the strongest `MAX_PASSAGES_PER_MATCH` of them in reading order. Scores exist only inside the engine; they are never shown, because the ratio is not calibrated against any external notion of copying.
 9. **Repeats** — `engine/repeats.ts`: union-find over near-duplicate sentence pairs inside one manuscript; occurrences closer than `REPEAT_MIN_GAP` sentences count once.
@@ -92,7 +92,8 @@ interface ChapterMatch {
   a: number | null // chapter of A
   b: number | null
   tier: 'near' | 'edited' // 'near' when any passage is 거의 동일
-  count: number // suspicious passages in this chapter pair
+  count: number // suspicious *sentences* in this chapter pair
+  runs: number // passages found, including those beyond the cap
   passages: Passage[] // up to MAX_PASSAGES_PER_MATCH, strongest, in reading order
 }
 interface CompareResult {
