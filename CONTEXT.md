@@ -60,8 +60,8 @@ Product (2026-09-21, mockup accepted):
 - Devices: PC and tablet. Mobile is out of scope.
 - Visual language: NovelTrack tokens (Pretendard Variable, near-white
   background, white cards). No gradients, no glass, no explanatory copy.
-- Header product name: `한국 웹소설 문장 · 문단 유사도 검사`.
-- Future public repository name: `korean-web-novel-similarity`. Change the
+- Header product name: `웹소설 문장 · 문단 유사도 검사`.
+- Future public repository name: `web-novel-similarity`. Change the
   Vite `base` from `/novel-similarity/` only when that repository is created.
 
 Engineering (2026-09-21, ADR 0002–0004):

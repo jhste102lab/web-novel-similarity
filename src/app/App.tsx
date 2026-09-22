@@ -24,7 +24,7 @@ type Screen =
   | { kind: 'analyzing'; run: Run<CompareResult | RepeatResult>; pct: number; two: boolean }
   | { kind: 'results'; result: CompareResult | RepeatResult; a: Slot; b: Slot | null }
 
-const REPO = 'https://github.com/jhste102lab/korean-web-novel-similarity'
+const REPO = 'https://github.com/jhste102lab/web-novel-similarity'
 const HWP_MESSAGE = 'hwp는 열 수 없어요. 한글에서 hwpx로 저장해 주세요.'
 const FORMAT_MESSAGE = 'txt, docx, hwpx 파일만 열 수 있어요.'
 
@@ -108,7 +108,7 @@ export function App() {
     <>
       <header className="top">
         <div className="logo">
-          한국 웹소설 문장 · 문단 유사도 검사
+          웹소설 문장 · 문단 유사도 검사
           <a className="gh" href={REPO} title="GitHub" target="_blank" rel="noreferrer">
             <GithubIcon />
           </a>

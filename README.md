@@ -1,4 +1,4 @@
-# 한국 웹소설 문장 · 문단 유사도 검사
+# 웹소설 문장 · 문단 유사도 검사
 
 웹소설 원고 두 개 사이에서, 또는 원고 하나 안에서 같거나 조금 고친 문장을 찾아 주는 웹 도구입니다.
 
@@ -29,7 +29,7 @@ node scripts/compare.ts A.txt         # 원고 하나 안의 반복
 
 확정된 화면 시안은 `docs/mockups/2026-09-21-similarity-check/index.html`입니다.
 
-GitHub에 공개할 때 저장소 이름은 `korean-web-novel-similarity`를 사용하고,
+GitHub에 공개할 때 저장소 이름은 `web-novel-similarity`를 사용하고,
 그때 `vite.config.ts`의 Pages 경로도 같은 이름으로 바꿉니다. 현재 경로는
 로컬/Tailscale 미리보기를 유지하기 위해 `/novel-similarity/`입니다.
 
