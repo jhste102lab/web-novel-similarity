@@ -923,15 +923,18 @@ mark {
   inset: 0;
   background: oklch(0 0 0/0.45);
   z-index: 20;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 32px;
+  overflow: auto;
 }
 .ov .panel {
   background: var(--card);
   border-radius: 18px;
   width: min(1200px, 100%);
-  max-height: 100%;
+  /* Against the padded viewport: max-height:100% let the panel overflow off the top. */
+  max-height: calc(100dvh - 64px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
@@ -1173,33 +1176,7 @@ mark {
   color: var(--fg);
 }
 
-/* dotplot, panels, streaming bar, shortcuts */
-.dotplot {
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--border);
-}
-.dotplot canvas {
-  display: block;
-  margin: 0 auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  cursor: crosshair;
-}
-.dotplot .axis {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--meta);
-}
-.dotplot .hint {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--meta);
-  font-variant-numeric: tabular-nums;
-  height: 18px;
-}
+/* panels, streaming bar, shortcuts */
 .scanning {
   position: relative;
   font-size: 13px;
@@ -1219,7 +1196,7 @@ mark {
 .bar-top .title .rng.stop {
   color: var(--t1);
 }
-.panel {
+.hud {
   position: fixed;
   right: 20px;
   bottom: 20px;
@@ -1231,7 +1208,7 @@ mark {
   font-size: 12px;
   min-width: 260px;
 }
-.panel .ph {
+.hud .ph {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1239,33 +1216,33 @@ mark {
   border-bottom: 1px solid var(--border);
   font-weight: 700;
 }
-.panel .ph .x {
+.hud .ph .x {
   color: var(--meta);
   font-size: 15px;
   line-height: 1;
 }
-.panel table {
+.hud table {
   border-collapse: collapse;
   width: 100%;
 }
-.panel th {
+.hud th {
   text-align: left;
   font-weight: 500;
   color: var(--meta);
   padding: 4px 12px;
   white-space: nowrap;
 }
-.panel td {
+.hud td {
   text-align: right;
   padding: 4px 12px;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
 }
-.panel tr:last-child td,
-.panel tr:last-child th {
+.hud tr:last-child td,
+.hud tr:last-child th {
   padding-bottom: 10px;
 }
-.panel kbd {
+.hud kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   border: 1px solid var(--border);

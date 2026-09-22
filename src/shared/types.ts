@@ -74,34 +74,11 @@ export interface RunStats {
   pairsScored: number
 }
 
-/** One cell of the chapter × chapter density map. */
-export interface GridCell {
-  a: number
-  b: number
-  count: number
-  near: number
-}
-
-/**
- * Chapter × chapter density behind the dotplot. Unlike `matches` this covers every
- * chapter pair found, including those the MAX_RESULTS cap drops from the list.
- */
-export interface Grid {
-  cells: GridCell[]
-  aMin: number
-  aMax: number
-  bMin: number
-  bMax: number
-  /** True when the cell cap dropped the sparsest cells. */
-  truncated: boolean
-}
-
 export interface CompareResult {
   kind: 'compare'
   matches: ChapterMatch[]
   /** Chapter pairs found before the MAX_RESULTS cap. */
   total: number
-  grid: Grid | null
   stats: RunStats
 }
 
@@ -120,8 +97,6 @@ export interface RepeatResult {
   groups: RepeatGroup[]
   /** Groups found before the MAX_RESULTS cap. */
   total: number
-  /** Chapters that share a repeated sentence; symmetric, so only a ≤ b cells exist. */
-  grid: Grid | null
   stats: RunStats
 }
 

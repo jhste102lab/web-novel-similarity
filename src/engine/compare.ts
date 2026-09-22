@@ -1,5 +1,4 @@
 import {
-  MAX_GRID_CELLS,
   MAX_PASSAGES_PER_MATCH,
   MAX_RESULTS,
   PARTIAL_EVERY_MS,
@@ -11,8 +10,6 @@ import type {
   ChapterMatch,
   ChapterRange,
   CompareResult,
-  Grid,
-  GridCell,
   ManuscriptText,
   Passage,
   RunStats,
@@ -179,35 +176,8 @@ function buildResult(
     kind: 'compare',
     total: list.length,
     matches: list.slice(0, MAX_RESULTS).map((g) => toMatch(g, idxA, idxB)),
-    grid: buildGrid(list),
     stats: { ...stats },
   }
-}
-
-/** Chapter pair densities for the dotplot; null when either side has no chapters. */
-function buildGrid(list: Group[]): Grid | null {
-  const cells: GridCell[] = []
-  for (const g of list) {
-    if (g.a === null || g.b === null) continue
-    cells.push({ a: g.a, b: g.b, count: g.count, near: g.near })
-  }
-  if (cells.length === 0) return null
-  const truncated = cells.length > MAX_GRID_CELLS
-  if (truncated) {
-    cells.sort((x, y) => y.count - x.count)
-    cells.length = MAX_GRID_CELLS
-  }
-  let aMin = Infinity
-  let aMax = -Infinity
-  let bMin = Infinity
-  let bMax = -Infinity
-  for (const c of cells) {
-    if (c.a < aMin) aMin = c.a
-    if (c.a > aMax) aMax = c.a
-    if (c.b < bMin) bMin = c.b
-    if (c.b > bMax) bMax = c.b
-  }
-  return { cells, aMin, aMax, bMin, bMax, truncated }
 }
 
 function toMatch(g: Group, idxA: SentenceIndex, idxB: SentenceIndex): ChapterMatch {

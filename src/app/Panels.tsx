@@ -21,7 +21,7 @@ export function Diagnostics({ stats, onClose }: { stats: RunStats; onClose: () =
     ['처리량', `${Math.round(speed).toLocaleString()}천 자/초`],
   ]
   return (
-    <div className="panel diag">
+    <div className="hud diag">
       <div className="ph">
         진단
         <button className="x" onClick={onClose} title="닫기 (d)">
@@ -48,7 +48,6 @@ const KEYS: [string, string][] = [
   ['g / G', '처음 / 마지막'],
   ['/', '찾기'],
   ['c', '현재 문장 복사'],
-  ['m', '회차 지도'],
   ['d', '진단'],
   ['Esc', '찾기 해제 · 패널 닫기'],
   ['?', '이 목록'],
@@ -56,7 +55,7 @@ const KEYS: [string, string][] = [
 
 export function Shortcuts({ onClose }: { onClose: () => void }) {
   return (
-    <div className="panel keys">
+    <div className="hud keys">
       <div className="ph">
         단축키
         <button className="x" onClick={onClose} title="닫기 (Esc)">

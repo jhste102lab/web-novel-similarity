@@ -3,15 +3,12 @@ import { charDiff } from '../engine/diff.ts'
 import type {
   ChapterMatch,
   CompareResult,
-  Grid,
-  GridCell,
   Passage,
   RepeatGroup,
   RepeatResult,
   RunStats,
   Tier,
 } from '../shared/types.ts'
-import { Dotplot } from './Dotplot.tsx'
 import { Marked } from './Marked.tsx'
 import { Diagnostics, Shortcuts } from './Panels.tsx'
 import {
@@ -143,20 +140,13 @@ interface ShellProps<T> {
   running: boolean
   stopped: boolean
   stats: RunStats
-  grid: Grid | null
-  axis: [string, string]
-  /** Chapter pair of the selected row, for the dotplot crosshair. */
-  cursorOf: (row: T) => { a: number | null; b: number | null } | null
-  /** Row index for a dotplot cell, or -1 when that pair is below the result cap. */
-  rowOfCell: (cell: GridCell) => number
 }
 
 /**
- * Everything both result views share: windowed list, keyboard review, dotplot, panels.
+ * Everything both result views share: windowed list, keyboard review, panels.
  * The two views differ only in what a row and a detail look like.
  */
 function ResultsShell<T>(p: ShellProps<T>) {
-  const [map, setMap] = useState(false)
   const [diag, setDiag] = useState(false)
   const [keys, setKeys] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -216,7 +206,6 @@ function ResultsShell<T>(p: ShellProps<T>) {
     }
     if (key === '?') return setKeys((v) => !v)
     if (key === 'd') return setDiag((v) => !v)
-    if (key === 'm') return setMap((v) => !v)
     if (key === 'c') {
       if (!row) return
       void copyText(p.copyOf(row)).then(() => flash('문장을 복사했어요'))
@@ -249,15 +238,6 @@ function ResultsShell<T>(p: ShellProps<T>) {
             onChange={(e) => p.onQuery(e.target.value)}
           />
           {p.tabs}
-          {p.grid && (
-            <button
-              className={`tab ${map ? 'on' : ''}`}
-              title="회차 지도 (m)"
-              onClick={() => setMap((v) => !v)}
-            >
-              지도
-            </button>
-          )}
         </div>
       </div>
       <div className="split">
@@ -266,19 +246,6 @@ function ResultsShell<T>(p: ShellProps<T>) {
         ) : (
           <>
             <div className="col">
-              {map && p.grid && (
-                <Dotplot
-                  grid={p.grid}
-                  axis={p.axis}
-                  cursor={row ? p.cursorOf(row) : null}
-                  onPick={(cell) => {
-                    const i = p.rowOfCell(cell)
-                    if (i >= 0) p.onSelect(i)
-                    // The map covers every chapter pair; the list is capped and filtered.
-                    else flash('이 회차쌍은 지금 목록에 없어요')
-                  }}
-                />
-              )}
               <div className="list" ref={list} onScroll={measure}>
                 <div style={{ height: p.rows.length * ROW_H, position: 'relative' }}>
                   <div style={{ transform: `translateY(${view.from * ROW_H}px)` }}>
@@ -380,10 +347,6 @@ export function CompareView({
       running={running}
       stopped={stopped}
       stats={result.stats}
-      grid={result.grid}
-      axis={['A', 'B']}
-      cursorOf={(m) => ({ a: m.a, b: m.b })}
-      rowOfCell={(cell) => rows.findIndex((m) => m.a === cell.a && m.b === cell.b)}
       copyOf={(m) => pairText(m.passages[0]!.a.text, m.passages[0]!.b.text)}
       renderRow={(q) => (
         <>
@@ -503,18 +466,6 @@ export function RepeatView({
       running={running}
       stopped={stopped}
       stats={result.stats}
-      grid={result.grid}
-      axis={['회차', '회차']}
-      cursorOf={(g) => ({
-        a: g.occurrences[0]!.chapter,
-        b: g.occurrences[g.occurrences.length - 1]!.chapter,
-      })}
-      rowOfCell={(cell) =>
-        rows.findIndex((g) => {
-          const chapters = new Set(g.occurrences.map((o) => o.chapter))
-          return chapters.has(cell.a) && chapters.has(cell.b)
-        })
-      }
       copyOf={(g) => g.text}
       renderRow={(q) => (
         <>

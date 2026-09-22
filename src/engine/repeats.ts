@@ -1,19 +1,11 @@
 import {
-  MAX_GRID_CELLS,
   MAX_RESULTS,
   PARTIAL_EVERY_MS,
   PROGRESS_EVERY,
   REPEAT_MIN_GAP,
   TIER_EDITED,
 } from '../shared/constants.ts'
-import type {
-  Grid,
-  GridCell,
-  ManuscriptText,
-  RepeatGroup,
-  RepeatResult,
-  RunStats,
-} from '../shared/types.ts'
+import type { ManuscriptText, RepeatGroup, RepeatResult, RunStats } from '../shared/types.ts'
 import { CandidateFinder } from './candidates.ts'
 import { commonPhrases, inRange } from './common.ts'
 import type { RunOptions } from './compare.ts'
@@ -123,7 +115,6 @@ function buildResult(
     else members.set(root, [i])
   }
   const groups: RepeatGroup[] = []
-  const chapterPairs = new Map<string, number>()
   for (const ids of members.values()) {
     ids.sort((x, y) => x - y)
     const kept: number[] = []
@@ -138,50 +129,12 @@ function buildResult(
       sentenceIndex: idx.ordinal[id]!,
     }))
     groups.push({ text: sentenceText(idx, first), occurrences })
-    countChapterPairs(chapterPairs, occurrences)
   }
   groups.sort((x, y) => y.occurrences.length - x.occurrences.length)
   return {
     kind: 'repeat',
     total: groups.length,
     groups: groups.slice(0, MAX_RESULTS),
-    grid: toGrid(chapterPairs),
     stats: { ...stats },
   }
-}
-
-/** Every chapter pair sharing this repeated sentence, counted once per group. */
-function countChapterPairs(
-  cells: Map<string, number>,
-  occurrences: { chapter: number | null }[],
-): void {
-  const chapters = [...new Set(occurrences.map((o) => o.chapter))].filter((c) => c !== null)
-  for (let x = 0; x < chapters.length; x++)
-    for (let y = x; y < chapters.length; y++) {
-      const key = `${chapters[x]!}|${chapters[y]!}`
-      cells.set(key, (cells.get(key) ?? 0) + 1)
-    }
-}
-
-function toGrid(pairs: Map<string, number>): Grid | null {
-  if (pairs.size === 0) return null
-  const cells: GridCell[] = []
-  for (const [key, count] of pairs) {
-    const [a, b] = key.split('|')
-    cells.push({ a: Number(a), b: Number(b), count, near: count })
-  }
-  const truncated = cells.length > MAX_GRID_CELLS
-  if (truncated) {
-    cells.sort((x, y) => y.count - x.count)
-    cells.length = MAX_GRID_CELLS
-  }
-  let min = Infinity
-  let max = -Infinity
-  for (const c of cells) {
-    if (c.a < min) min = c.a
-    if (c.b < min) min = c.b
-    if (c.a > max) max = c.a
-    if (c.b > max) max = c.b
-  }
-  return { cells, aMin: min, aMax: max, bMin: min, bMax: max, truncated }
 }
