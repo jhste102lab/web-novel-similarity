@@ -151,9 +151,11 @@ The two result views share `ResultsShell` in `src/app/ResultsScreen.tsx`:
 ## Offline
 
 `public/sw.js` caches the shell and this build's JS/CSS at install, then every
-same-origin GET as it is requested, cache-first with a background refresh.
-Asset names are content-hashed, so a stale entry is never wrong; a new build
-installs a new worker and `skipWaiting` + `clients.claim` hand over at once.
+same-origin GET as it is requested. Assets are cache-first (their names carry a
+content hash, so a hit is never the wrong file); **navigations are network-first**
+with a cache fallback, because the HTML shell names the hashed assets of its build
+and serving a cached one pins the whole app to an old version. The cache is named
+after the build, so `activate` drops the previous one.
 The point is verification, not speed: pulling the network and reloading proves
 the "nothing is uploaded" claim.
 

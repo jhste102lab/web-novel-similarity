@@ -1,6 +1,7 @@
-// Fills the PRECACHE placeholder in dist/sw.js with the hashed asset names of this build.
-// Runtime caching alone is not enough: a browser may satisfy sub-resource requests from its own
-// HTTP cache without ever asking the service worker, leaving the app unusable offline.
+// Fills the PRECACHE placeholder in dist/sw.js with the hashed asset names of this build, and
+// names the cache after them. Runtime caching alone is not enough: a browser may satisfy
+// sub-resource requests from its own HTTP cache without ever asking the service worker.
+import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 const dist = new URL('../dist/', import.meta.url)
@@ -11,7 +12,11 @@ const assets = readdirSync(new URL('assets/', dist))
 
 const sw = new URL('sw.js', dist)
 const source = readFileSync(sw, 'utf8')
-const filled = source.replace("/*PRECACHE*/ ['']", JSON.stringify(['', ...assets]))
+const build = createHash('sha256').update(assets.join('|')).digest('hex').slice(0, 8)
+const filled = source
+  .replace("/*PRECACHE*/ ['']", JSON.stringify(['', ...assets]))
+  // A per-build cache name makes activate() drop the previous build instead of keeping both.
+  .replace("'novel-similarity-v1'", `'novel-similarity-${build}'`)
 if (filled === source) throw new Error("sw.js has no /*PRECACHE*/ [''] placeholder")
 writeFileSync(sw, filled)
-console.log(`sw.js precaches ${assets.length + 1} files`)
+console.log(`sw.js precaches ${assets.length + 1} files as novel-similarity-${build}`)
