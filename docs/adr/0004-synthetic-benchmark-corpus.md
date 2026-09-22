@@ -1,6 +1,6 @@
 # 0004 — Tier thresholds are tuned on a fully synthetic corpus
 
-Status: Accepted (2026-09-21).
+Status: Accepted (2026-09-21), amended for private local validation (2026-09-22).
 
 ## Context
 
@@ -23,10 +23,18 @@ only synthetic data; or use public-domain Korean text.
 - Thresholds live in one constants file in the engine and are changed only
   together with the benchmark report.
 
+- Real manuscripts MAY be used only for local validation of false-positive
+  rates. Their text, title, filename, path, hash, fingerprints, diffs, and
+  per-manuscript results are never committed. A public report may contain only
+  anonymous aggregate counts and the resulting threshold decision.
+- Private manuscripts live outside the repository when practical; the local
+  `manuscripts/` fallback is gitignored. Neither location is a dataset shipped
+  with the application.
+
 ## Consequences
 
-- Thresholds may not reflect every real stylistic habit. Users adjust
-  sensitivity by switching result tabs, which limits the damage of a slightly
-  off boundary.
+- Synthetic thresholds may not reflect every real stylistic habit. Private
+  local validation can improve confidence and threshold calibration, but
+  adding manuscripts does not train or automatically improve the engine.
 - Anyone can re-run the benchmark; the repository stays free of copyrighted
   text.
