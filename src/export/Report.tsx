@@ -90,8 +90,8 @@ function MatchRow({ m, perMatch }: { m: ChapterMatch; perMatch: number }) {
         <i className={`dot ${TIER_CLASS[m.tier]}`} />
         {TIER_LABEL[m.tier]}
         <span>
-          A {chapterLabel(m.a)} · B {chapterLabel(m.b)} · 유사 문장 {m.count}개
-          {m.count > shown.length && ` (상위 ${shown.length}개)`}
+          A {chapterLabel(m.a)} · B {chapterLabel(m.b)} · 유사 문장 {m.count}개 · 구간 {m.runs}개
+          {m.runs > shown.length && ` (상위 ${shown.length}개 표시)`}
         </span>
       </div>
       {shown.map((p, i) => (
