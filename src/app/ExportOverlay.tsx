@@ -4,10 +4,12 @@ import { savePdf, savePng } from '../export/save.ts'
 interface Props {
   fileName: string
   onClose: () => void
+  /** Rendered next to the save button; used for report options. */
+  options?: React.ReactNode
   children: React.ReactNode
 }
 
-export function ExportOverlay({ fileName, onClose, children }: Props) {
+export function ExportOverlay({ fileName, onClose, options, children }: Props) {
   const [menu, setMenu] = useState(false)
   const [busy, setBusy] = useState(false)
   const body = useRef<HTMLDivElement>(null)
@@ -37,6 +39,7 @@ export function ExportOverlay({ fileName, onClose, children }: Props) {
       <div className="panel">
         <div className="ph">
           <h2>내보내기</h2>
+          {options}
           <div className="dd">
             <button className="btn primary" disabled={busy} onClick={() => setMenu(!menu)}>
               {busy ? '만드는 중…' : '파일로 저장 ▾'}

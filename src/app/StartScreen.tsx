@@ -16,6 +16,8 @@ interface Props {
   onClear: (key: 'A' | 'B') => void
   onSwap: () => void
   onGo: () => void
+  /** Why the last run failed, shown above the button. */
+  runError: string | null
 }
 
 export function StartScreen({
@@ -28,6 +30,7 @@ export function StartScreen({
   onClear,
   onSwap,
   onGo,
+  runError,
 }: Props) {
   const ready = a.slot !== null && (!two || b.slot !== null)
   return (
@@ -68,6 +71,7 @@ export function StartScreen({
         )}
       </div>
       <div className="go">
+        {runError && <div className="run-err">{runError}</div>}
         <button className="btn primary lg" disabled={!ready} onClick={onGo}>
           {two ? '비교하기' : '반복 찾기'}
         </button>

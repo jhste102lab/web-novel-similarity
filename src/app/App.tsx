@@ -39,6 +39,8 @@ export function App() {
   const [filter, setFilter] = useState<CompareFilter | RepeatFilter>('all')
   const [selected, setSelected] = useState(0)
   const [exporting, setExporting] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
+  const [perMatch, setPerMatch] = useState(20)
 
   const setSlot = (key: Key, view: SlotView): void => setSlots((s) => ({ ...s, [key]: view }))
 
@@ -80,6 +82,7 @@ export function App() {
           { type: 'repeat', a: slotEngineText(a), rangeA: range(a) },
           onProgress,
         )
+    setRunError(null)
     setScreen({ kind: 'analyzing', run, pct: 0, two: b !== null })
     run.result.then(
       (result) => {
@@ -87,7 +90,11 @@ export function App() {
         setSelected(0)
         setScreen({ kind: 'results', result, a, b })
       },
-      () => setScreen({ kind: 'start' }),
+      (err: unknown) => {
+        // Aborting rejects too; only a real failure needs a message.
+        if (!run.aborted) setRunError(`검사를 끝내지 못했어요. ${String(err)}`)
+        setScreen({ kind: 'start' })
+      },
     )
   }
 
@@ -151,6 +158,7 @@ export function App() {
             }
             onSwap={() => setSlots((s) => ({ A: s.B, B: s.A }))}
             onGo={start}
+            runError={runError}
           />
         )}
         {screen.kind === 'analyzing' && (
@@ -200,7 +208,22 @@ export function App() {
       </main>
       {modal && <Modal {...modal} onNo={() => setModal(null)} />}
       {exporting && results && (
-        <ExportOverlay fileName={`유사도 검사 ${today()}`} onClose={() => setExporting(false)}>
+        <ExportOverlay
+          fileName={`유사도 검사 ${today()}`}
+          onClose={() => setExporting(false)}
+          options={
+            isCompare && (
+              <label className="opt">
+                회차당 문장
+                <select value={perMatch} onChange={(e) => setPerMatch(Number(e.target.value))}>
+                  <option value={20}>전체</option>
+                  <option value={5}>5개</option>
+                  <option value={1}>1개</option>
+                </select>
+              </label>
+            )
+          }
+        >
           {isCompare ? (
             <CompareReport
               meta={{
@@ -213,6 +236,7 @@ export function App() {
                 (results.result as CompareResult).matches,
                 filter as CompareFilter,
               )}
+              perMatch={perMatch}
             />
           ) : (
             <RepeatReport

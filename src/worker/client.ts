@@ -5,6 +5,8 @@ export interface Run<T> {
   result: Promise<T>
   /** Terminates the worker; `result` rejects with 'aborted'. */
   abort: () => void
+  /** True once abort() ran, so the UI can tell a cancellation from a failure. */
+  aborted: boolean
 }
 
 /** Starts one analysis in a fresh worker. The worker is discarded when it finishes or is aborted. */
@@ -30,11 +32,14 @@ export function runInWorker<T extends CompareResult | RepeatResult>(
     worker.terminate()
   }
   worker.postMessage(request)
-  return {
+  const run: Run<T> = {
     result: promise,
+    aborted: false,
     abort: () => {
+      run.aborted = true
       worker.terminate()
       reject(new Error('aborted'))
     },
   }
+  return run
 }

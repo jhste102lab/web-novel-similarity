@@ -14,6 +14,8 @@ interface CompareReportProps {
   meta: ReportMeta
   all: ChapterMatch[]
   rows: ChapterMatch[]
+  /** Passages printed per chapter pair; a full report of a copied work runs to hundreds of pages. */
+  perMatch: number
 }
 
 interface RepeatReportProps {
@@ -41,7 +43,7 @@ function Meta({ meta }: { meta: ReportMeta }) {
   )
 }
 
-export function CompareReport({ meta, all, rows }: CompareReportProps) {
+export function CompareReport({ meta, all, rows, perMatch }: CompareReportProps) {
   const n = (t: Tier): number => all.filter((m) => m.tier === t).length
   return (
     <div className="rp">
@@ -59,7 +61,7 @@ export function CompareReport({ meta, all, rows }: CompareReportProps) {
         </div>
       </div>
       {rows.map((m, i) => (
-        <MatchRow key={i} m={m} />
+        <MatchRow key={i} m={m} perMatch={perMatch} />
       ))}
       <div className="foot">{FOOT}</div>
     </div>
@@ -80,7 +82,8 @@ function useMarkedPair(a: string, b: string): [React.ReactNode, React.ReactNode]
     : [a, b]
 }
 
-function MatchRow({ m }: { m: ChapterMatch }) {
+function MatchRow({ m, perMatch }: { m: ChapterMatch; perMatch: number }) {
+  const shown = m.passages.slice(0, perMatch)
   return (
     <div className="row">
       <div className="h">
@@ -88,10 +91,10 @@ function MatchRow({ m }: { m: ChapterMatch }) {
         {TIER_LABEL[m.tier]}
         <span>
           A {chapterLabel(m.a)} · B {chapterLabel(m.b)} · 유사 문장 {m.count}개
-          {m.count > m.passages.length && ` (상위 ${m.passages.length}개)`}
+          {m.count > shown.length && ` (상위 ${shown.length}개)`}
         </span>
       </div>
-      {m.passages.map((p, i) => (
+      {shown.map((p, i) => (
         <PassageRow key={i} p={p} />
       ))}
     </div>

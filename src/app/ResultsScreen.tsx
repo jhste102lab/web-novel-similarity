@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { charDiff } from '../engine/diff.ts'
 import { Marked } from './Marked.tsx'
 import type {
@@ -65,8 +65,64 @@ function Tab<F>({
     </button>
   )
 }
-function EmptyResults({ children }: { children: React.ReactNode }) {
-  return <div className="empty-results">{children}</div>
+
+function Search({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <input
+      className="find"
+      value={value}
+      placeholder="회차·문장 찾기"
+      spellCheck={false}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
+
+/** ↑/↓ move the selection; the list scrolls the selected row into view. */
+function useListNav(count: number, selected: number, onSelect: (i: number) => void) {
+  const row = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    // Effects must return a cleanup function or nothing; scrollIntoView's value would be called.
+    row.current?.scrollIntoView({ block: 'nearest' })
+  }, [selected])
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0
+    if (step === 0 || count === 0) return
+    e.preventDefault()
+    onSelect(Math.min(count - 1, Math.max(0, selected + step)))
+  }
+  return { row, onKeyDown }
+}
+
+/** navigator.clipboard is undefined on plain-http origins (LAN/Tailscale), so fall back to execCommand. */
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard) return navigator.clipboard.writeText(text)
+  const area = document.createElement('textarea')
+  area.value = text
+  area.style.position = 'fixed'
+  area.style.opacity = '0'
+  document.body.append(area)
+  area.select()
+  document.execCommand('copy')
+  area.remove()
+}
+
+function CopyButton({ a, b }: { a: string; b?: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <button
+      className="copy"
+      onClick={() => {
+        const text = b ? `A: ${a}\n\nB: ${b}` : a
+        void copyText(text).then(() => {
+          setDone(true)
+          setTimeout(() => setDone(false), 1200)
+        })
+      }}
+    >
+      {done ? '복사됨' : '복사'}
+    </button>
+  )
 }
 
 export function CompareView({
@@ -79,9 +135,14 @@ export function CompareView({
   selected,
   onSelect,
 }: CompareProps) {
-  const rows = filterMatches(result.matches, filter)
+  const [query, setQuery] = useState('')
+  const rows = useMemo(
+    () => searchMatches(filterMatches(result.matches, filter), query),
+    [result, filter, query],
+  )
   const capped = cappedNote(result.matches.length, result.total)
   const m = rows[selected] ?? rows[0]
+  const nav = useListNav(rows.length, selected, onSelect)
   const tierTab = (t: Tier) => (
     <Tab
       cur={filter}
@@ -97,7 +158,7 @@ export function CompareView({
     />
   )
   return (
-    <div className="results">
+    <div className="results" tabIndex={0} onKeyDown={nav.onKeyDown}>
       <div className="bar-top">
         <div className="title">
           {titleA}
@@ -107,6 +168,7 @@ export function CompareView({
           {capped && <span className="rng">{capped}</span>}
         </div>
         <div className="tabs">
+          <Search value={query} onChange={setQuery} />
           <Tab
             cur={filter}
             value="all"
@@ -120,12 +182,19 @@ export function CompareView({
       </div>
       <div className="split">
         {rows.length === 0 ? (
-          <EmptyResults>의심되는 유사 문장이 없습니다.</EmptyResults>
+          <EmptyResults>
+            {query ? '찾는 조건에 맞는 결과가 없습니다.' : '의심되는 유사 문장이 없습니다.'}
+          </EmptyResults>
         ) : (
           <>
             <div className="list">
               {rows.map((q, i) => (
-                <div key={i} className={`item ${q === m ? 'on' : ''}`} onClick={() => onSelect(i)}>
+                <div
+                  key={i}
+                  ref={q === m ? nav.row : null}
+                  className={`item ${q === m ? 'on' : ''}`}
+                  onClick={() => onSelect(i)}
+                >
                   <i className={`dot ${TIER_CLASS[q.tier]}`} />
                   <div className="b">
                     <div className="pos">
@@ -139,12 +208,28 @@ export function CompareView({
                 </div>
               ))}
             </div>
-            {m && <MatchDetail m={m} />}
+            {/* key remounts the pane so a new selection starts at the top, not where the last one was scrolled. */}
+            {m && <MatchDetail key={rows.indexOf(m)} m={m} />}
           </>
         )}
       </div>
     </div>
   )
+}
+
+/** Matches whose chapter labels or passage text contain the query. */
+function searchMatches(matches: ChapterMatch[], query: string): ChapterMatch[] {
+  const q = query.trim()
+  if (q === '') return matches
+  return matches.filter(
+    (m) =>
+      `${chapterLabel(m.a)} ${chapterLabel(m.b)}`.includes(q) ||
+      m.passages.some((p) => p.a.text.includes(q) || p.b.text.includes(q)),
+  )
+}
+
+function EmptyResults({ children }: { children: React.ReactNode }) {
+  return <div className="empty-results">{children}</div>
 }
 
 function MatchDetail({ m }: { m: ChapterMatch }) {
@@ -174,6 +259,7 @@ function PassagePair({ p }: { p: Passage }) {
       <div className="pane">
         <div className="k">
           <b>A</b> {ordinal(p.a)}
+          <CopyButton a={p.a.text} b={p.b.text} />
         </div>
         <Marked diff={diff} side="a" />
       </div>
@@ -188,14 +274,19 @@ function PassagePair({ p }: { p: Passage }) {
 }
 
 export function RepeatView({ result, titleA, filter, onFilter, selected, onSelect }: RepeatProps) {
-  const rows = filterGroups(result.groups, filter)
+  const [query, setQuery] = useState('')
+  const rows = useMemo(
+    () => searchGroups(filterGroups(result.groups, filter), query),
+    [result, filter, query],
+  )
   const count = (f: RepeatFilter): number => filterGroups(result.groups, f).length
   const g = rows[selected] ?? rows[0]
+  const nav = useListNav(rows.length, selected, onSelect)
   const capped = cappedNote(result.groups.length, result.total)
   const span = (q: RepeatGroup): string =>
     `${where(q.occurrences[0]!)}~${where(q.occurrences[q.occurrences.length - 1]!)}`
   return (
-    <div className="results">
+    <div className="results" tabIndex={0} onKeyDown={nav.onKeyDown}>
       <div className="bar-top">
         <div className="title">
           {titleA}
@@ -203,6 +294,7 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
           {capped && <span className="rng">{capped}</span>}
         </div>
         <div className="tabs">
+          <Search value={query} onChange={setQuery} />
           <Tab cur={filter} value="all" label="전체" count={count('all')} onFilter={onFilter} />
           <Tab cur={filter} value={3} label="3회 이상" count={count(3)} onFilter={onFilter} />
           <Tab cur={filter} value={5} label="5회 이상" count={count(5)} onFilter={onFilter} />
@@ -210,12 +302,19 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
       </div>
       <div className="split">
         {rows.length === 0 ? (
-          <EmptyResults>의심되는 반복 문장이 없습니다.</EmptyResults>
+          <EmptyResults>
+            {query ? '찾는 조건에 맞는 결과가 없습니다.' : '의심되는 반복 문장이 없습니다.'}
+          </EmptyResults>
         ) : (
           <>
             <div className="list">
               {rows.map((q, i) => (
-                <div key={i} className={`item ${q === g ? 'on' : ''}`} onClick={() => onSelect(i)}>
+                <div
+                  key={i}
+                  ref={q === g ? nav.row : null}
+                  className={`item ${q === g ? 'on' : ''}`}
+                  onClick={() => onSelect(i)}
+                >
                   <i className="dot t2" />
                   <div className="b">
                     <div className="pos">
@@ -228,10 +327,11 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
               ))}
             </div>
             {g && (
-              <div className="detail">
+              <div className="detail" key={rows.indexOf(g)}>
                 <div className="head">
                   <span className="pct">{g.occurrences.length}회</span>
                   <span className="where">{span(g)}</span>
+                  <CopyButton a={g.text} />
                 </div>
                 {g.occurrences.slice(0, MAX_OCCURRENCES).map((o, i) => (
                   <div key={i} className="occ">
@@ -252,4 +352,11 @@ export function RepeatView({ result, titleA, filter, onFilter, selected, onSelec
       </div>
     </div>
   )
+}
+
+/** Groups whose sentence or chapter labels contain the query. */
+function searchGroups(groups: RepeatGroup[], query: string): RepeatGroup[] {
+  const q = query.trim()
+  if (q === '') return groups
+  return groups.filter((g) => g.text.includes(q) || g.occurrences.some((o) => where(o).includes(q)))
 }

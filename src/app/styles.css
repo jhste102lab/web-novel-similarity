@@ -1085,3 +1085,71 @@ mark {
     break-inside: avoid;
   }
 }
+
+/* search box, copy button, elapsed time, run error, export options */
+.tabs .find {
+  height: 32px;
+  width: 150px;
+  padding: 0 10px;
+  margin-right: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  outline: none;
+}
+.tabs .find:focus {
+  border-color: var(--fg);
+}
+.results:focus {
+  outline: none;
+}
+.pane .k .copy {
+  float: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--meta);
+  padding: 0 6px;
+  border-radius: 6px;
+}
+.detail .head .copy {
+  margin-left: 12px;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--meta);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.pane .k .copy:hover,
+.detail .head .copy:hover {
+  background: var(--muted);
+  color: var(--fg);
+}
+.analyzing .elapsed {
+  color: var(--meta);
+  font-size: 13px;
+  margin-top: 4px;
+}
+.go .run-err {
+  color: var(--t1);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ov .ph .opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--meta);
+  margin-right: 8px;
+}
+.ov .ph .opt select {
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 0 6px;
+  font: inherit;
+  color: var(--fg);
+}
