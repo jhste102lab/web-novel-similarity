@@ -27,14 +27,14 @@ are owned by the documents linked below and are not repeated here.
 
 ## Sources of truth
 
-| Scope                                                         | Document                                              |
-| ------------------------------------------------------------- | ----------------------------------------------------- |
-| Document map and update rules                                 | `docs/README.md`                                      |
-| Terms, chapter detection, product decisions                   | `CONTEXT.md`                                          |
-| Runtime structure, worker protocol, result types, thresholds  | `docs/ssot/architecture.md`                           |
-| Code style, module boundaries, testing, approved dependencies | `docs/ssot/engineering-rules.md`                      |
-| Why decisions were made                                       | `docs/adr/`                                           |
-| Accepted UI (until the app exists)                            | `docs/mockups/2026-09-21-similarity-check/index.html` |
+| Scope                                                         | Document                         |
+| ------------------------------------------------------------- | -------------------------------- |
+| Document map and update rules                                 | `docs/README.md`                 |
+| Terms, chapter detection, product decisions                   | `CONTEXT.md`                     |
+| Runtime structure, worker protocol, result types, thresholds  | `docs/ssot/architecture.md`      |
+| Code style, module boundaries, testing, approved dependencies | `docs/ssot/engineering-rules.md` |
+| Why decisions were made                                       | `docs/adr/`                      |
+| Where a feature lives (file map)                              | `docs/ssot/architecture.md`      |
 
 Code beats documents for "what exists"; documents beat code for "what was
 decided". If they disagree, fix the document in the same change.
@@ -43,9 +43,9 @@ decided". If they disagree, fix the document in the same change.
 
 - `src/engine/` and `src/parsers/` have no DOM or React imports and are
   tested by input/output only.
-- Every UI string is Korean and matches the mockup wording unless
-  `CONTEXT.md` says otherwise. No explanatory copy, no settings that the
-  mockup does not show.
+- Every UI string is Korean. Wording and visible settings follow the
+  shipped app and `CONTEXT.md`; the mockup is history. No explanatory copy,
+  no settings the owner has not accepted.
 - Dependencies outside the table in `docs/ssot/engineering-rules.md` are not
   added without updating that table.
 - Thresholds change only together with a benchmark report in `docs/plan/`.

@@ -12,24 +12,6 @@ export interface ManuscriptText {
 
 export type ChapterRule = 'filename-number' | 'filename-order' | 'title-lines' | 'none'
 
-export interface FileInfo {
-  name: string
-  lastModified: number
-  chapter: number | null
-  chars: number
-  firstSentence: string
-}
-
-/** What the UI shows on a filled slot card. */
-export interface ManuscriptInfo {
-  title: string
-  files: FileInfo[]
-  chapterRule: ChapterRule
-  totalChars: number
-  /** Present only for chapter-bearing manuscripts. */
-  chapterMax: number | null
-}
-
 export type Tier = 'near' | 'edited'
 
 export interface Span {

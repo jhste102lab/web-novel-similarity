@@ -3,6 +3,6 @@ import { defineConfig } from 'vite'
 
 // GitHub Pages serves the site under /<repo>/; dev and preview use the same path.
 export default defineConfig({
-  base: '/novel-similarity/',
+  base: '/web-novel-similarity/',
   plugins: [react()],
 })

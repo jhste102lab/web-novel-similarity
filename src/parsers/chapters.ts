@@ -1,7 +1,7 @@
 import type { Chapter, ChapterRule } from '../shared/types.ts'
 
 /** Last number in a file name (extension excluded), e.g. `검은달_12화.txt` → 12. */
-export function chapterFromFilename(name: string): number | null {
+function chapterFromFilename(name: string): number | null {
   const stem = name.replace(/\.[^.]+$/, '')
   const m = /(\d{1,5})(?!.*\d)/.exec(stem)
   return m ? Number(m[1]) : null

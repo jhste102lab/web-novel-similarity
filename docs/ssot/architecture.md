@@ -16,17 +16,40 @@ No network requests after the page loads. Parsing happens on the main thread
 (it needs `DOMParser`, and `mammoth` is loaded on demand); only the extracted
 text goes to the worker.
 
-## Module map
+## File map
 
-| Path           | Role                                                                                        |
-| -------------- | ------------------------------------------------------------------------------------------- |
-| `src/parsers/` | bytes → text, chapter detection, `Manuscript` assembly                                      |
-| `src/engine/`  | sentence index, fingerprints, candidate retrieval, edit distance, compare, repeats          |
-| `src/worker/`  | `protocol.ts` message types, `worker.ts` entry, `client.ts` `runInWorker`                   |
-| `src/app/`     | React screens (start / analyzing / results), slot state, range slider, export modal, panels |
-| `src/export/`  | printable report components and PNG/PDF saving                                              |
-| `src/shared/`  | `types.ts` (data contracts), `constants.ts` (every tunable)                                 |
-| `public/sw.js` | offline cache; the build injects this build's file names (`scripts/sw-precache.ts`)         |
+Where to look first for a given change. Tests sit next to their module.
+
+| Path                                                              | What lives there                                                                         |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `src/main.tsx`                                                    | React root, stylesheet imports, service-worker registration                              |
+| `src/shared/types.ts`                                             | Data contracts between parser, engine, worker and UI                                     |
+| `src/shared/constants.ts`                                         | Every threshold and limit (table below)                                                  |
+| `src/parsers/parseFile.ts`                                        | Extension → text; `.docx` via mammoth, `.hwp` rejected                                   |
+| `src/parsers/text.ts`, `hwpx.ts`                                  | `.txt` decoding (BOM, EUC-KR fallback); `.hwpx` section XML                              |
+| `src/parsers/chapters.ts`                                         | Chapter detection: filename numbers, filename order, title lines                         |
+| `src/parsers/manuscript.ts`                                       | Many files → one `Manuscript` → engine `ManuscriptText`                                  |
+| `src/engine/sentences.ts`                                         | Sentence split and normalised index in typed arrays                                      |
+| `src/engine/fingerprints.ts`, `candidates.ts`                     | Winnowing fingerprints, inverted index, candidate pairs                                  |
+| `src/engine/editDistance.ts`                                      | Banded Levenshtein → similarity ratio                                                    |
+| `src/engine/common.ts`                                            | 흔한 표현 detection, chapter-range mask                                                  |
+| `src/engine/compare.ts`                                           | A/B scan, passage chaining, chapter grouping, streaming snapshots                        |
+| `src/engine/repeats.ts`                                           | 내부 반복: union-find over near-duplicates in one manuscript                             |
+| `src/engine/diff.ts`                                              | Character diff shown in the detail pane and the report                                   |
+| `src/worker/`                                                     | `protocol.ts` messages, `worker.ts` entry, `client.ts` `runInWorker` (abort = terminate) |
+| `src/app/App.tsx`                                                 | Screen state machine (start → analyzing → results), header, export wiring                |
+| `src/app/StartScreen.tsx`, `SlotCard.tsx`, `RangeSlider.tsx`      | File slots, chapter table edits, 검사 범위                                               |
+| `src/app/slot.ts`, `dropFiles.ts`                                 | Slot model and labels; folder drops                                                      |
+| `src/app/AnalyzingScreen.tsx`                                     | Progress until the first findings arrive                                                 |
+| `src/app/ResultsShell.tsx`                                        | Shared result layout: windowed list, keyboard, search, panels                            |
+| `src/app/CompareView.tsx`, `RepeatView.tsx`                       | Row and detail rendering for each mode                                                   |
+| `src/app/results.ts`                                              | Tier labels, filters, position labels shared by views and report                         |
+| `src/app/CopyButton.tsx`, `Marked.tsx`, `Modal.tsx`, `Panels.tsx` | Copy, diff marks, confirm dialog, diagnostics/shortcut HUDs                              |
+| `src/app/ExportOverlay.tsx`, `src/export/`                        | Export dialog; printable report; PNG/PDF saving                                          |
+| `src/app/styles/`                                                 | One stylesheet per screen; `export.css` holds the print rules                            |
+| `public/sw.js`, `scripts/sw-precache.ts`                          | Offline cache; the build injects hashed file names                                       |
+| `scripts/compare.ts`                                              | CLI: compare two files, or find repeats in one                                           |
+| `bench/`                                                          | Synthetic corpus generator and threshold benchmark (`npm run bench`)                     |
 
 ## Pipeline
 
@@ -37,9 +60,9 @@ text goes to the worker.
 5. **Precise compare** — `engine/editDistance.ts`: Ukkonen-banded Levenshtein on the normalised sentences → ratio. Pairs below `TIER_EDITED` are discarded, so nothing weaker than 일부 수정 is ever reported. There is no n-gram-only fallback: it only produced hits in the old 부분 유사 band, which was pure noise on unrelated manuscripts.
 6. **Passage chaining** — `engine/compare.ts`: pairs on one diagonal ((i,j) after (i−1,j−1)) become one passage; score = mean of member scores. **A run stops at a chapter boundary on either side**: a manuscript copied wholesale is one unbroken diagonal, and without the break every copied chapter collapsed into a single finding.
 7. **Noise removal** — a one-sentence passage whose text is a 흔한 표현 (`engine/common.ts`: ≤ `COMMON_MAX_CHARS` chars, appearing in ≥ `COMMON_MIN_CHAPTERS` chapters) is dropped, not tagged. The same rule drops 흔한 표현 groups in 내부 반복.
-8. **Chapter grouping** — passages are grouped by (chapter of A, chapter of B). One `ChapterMatch` = one row in the UI: tier (`near` when any of its passages is 거의 동일, from the _rounded_ percentage), `count` of suspicious passages, and the strongest `MAX_PASSAGES_PER_MATCH` of them in reading order. Scores exist only inside the engine; they are never shown, because the ratio is not calibrated against any external notion of copying.
+8. **Chapter grouping** — passages are grouped by (chapter of A, chapter of B). One `ChapterMatch` = one row in the UI: tier (`near` when any of its passages is 거의 동일, from the _rounded_ percentage), `count` of matched sentences, `runs` of passages, and the strongest `MAX_PASSAGES_PER_MATCH` of them in reading order. Scores exist only inside the engine; they are never shown, because the ratio is not calibrated against any external notion of copying.
 9. **Repeats** — `engine/repeats.ts`: union-find over near-duplicate sentence pairs inside one manuscript; occurrences closer than `REPEAT_MIN_GAP` sentences count once.
-10. **Result cap** — chapter pairs are sorted by 거의 동일 count, then passage count, and cut to `MAX_RESULTS`; `total` carries the uncapped count and the UI says how many were hidden.
+10. **Result cap** — chapter pairs are sorted by 거의 동일 count, then matched-sentence count, and cut to `MAX_RESULTS`; `total` carries the uncapped count and the UI says how many were hidden.
 11. **Streaming** — every `PARTIAL_EVERY_MS` the scan regroups the pairs found so far and posts them as a `partial` response. The UI leaves the progress screen at the first partial, so review starts about a second into a 2M-char run instead of after it. Stopping keeps what was scanned.
 12. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened; 1-char equal islands are folded into the surrounding change.
 
@@ -142,9 +165,9 @@ All in `src/shared/constants.ts`; rationale in
 
 ## Result review
 
-The two result views share `ResultsShell` in `src/app/ResultsScreen.tsx`:
+The two result views (`CompareView`, `RepeatView`) share `ResultsShell` in `src/app/ResultsShell.tsx`:
 
-- **Windowed list** — rows are a fixed 75 px (`.item` in `styles.css`, `ROW_H` in the view), so 3,000 findings render as ~20 nodes.
+- **Windowed list** — rows are a fixed 75 px (`.item` in `styles/results.css`, `ROW_H` in `ResultsShell.tsx`), so 3,000 findings render as ~20 nodes.
 - **Keyboard** — `j`/`k`/arrows, `g`/`G`, `/` to search, `c` to copy, `d` for diagnostics, `?` for the sheet.
 - **Diagnostics** (`src/app/Panels.tsx`) — phase timings plus `pairsScored / pairsNaive`, which is what the fingerprint index buys: 0.014 % on a 2M × 2M-char run.
 
@@ -161,12 +184,12 @@ the "nothing is uploaded" claim.
 
 ## Export
 
-- **PDF**: `window.print()` with `@media print` rules in `src/app/styles.css`. The report keeps selectable text and the browser paginates it. Rasterising the whole report into one image produced blank pages once it exceeded the canvas height limit.
+- **PDF**: `window.print()` with `@media print` rules in `src/app/styles/export.css`. The report keeps selectable text and the browser paginates it. Rasterising the whole report into one image produced blank pages once it exceeded the canvas height limit.
 - **PNG**: `html2canvas-pro`, scale capped so neither side exceeds `MAX_CANVAS_SIDE` (16,000 px).
 
 ## Build and deploy
 
 Vite static build → `dist/`; GitHub Actions workflow on `main` publishes to
-GitHub Pages. `base` is fixed to `/novel-similarity/`. No environment
+GitHub Pages. `base` is `/web-novel-similarity/`, the repository name. No environment
 variables. `html2canvas-pro` and `mammoth` are dynamically imported so they
 stay out of the initial bundle.

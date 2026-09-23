@@ -1,6 +1,6 @@
 // Browsers cap canvas dimensions (~16k–32k px), so a long report cannot be rasterised as one
 // image. PNG scales down to fit the cap; PDF goes through the browser's print dialog, which
-// paginates real text (print styles live in styles.css under @media print).
+// paginates real text (print rules live in app/styles/export.css).
 const MAX_CANVAS_SIDE = 16_000
 
 export async function savePng(node: HTMLElement, name: string): Promise<void> {

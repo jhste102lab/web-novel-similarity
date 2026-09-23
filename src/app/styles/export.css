@@ -1,0 +1,208 @@
+/* Export overlay, printable report, and the print rules that turn it into a PDF. */
+.ov {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0/0.45);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  overflow: auto;
+}
+.ov .panel {
+  background: var(--card);
+  border-radius: 18px;
+  width: min(1200px, 100%);
+  /* Against the padded viewport: max-height:100% let the panel overflow off the top. */
+  max-height: calc(100dvh - 64px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+.ov .ph {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.ov .ph h2 {
+  margin: 0;
+  font-size: 18px;
+  margin-right: auto;
+}
+.ov .ph .x {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 22px;
+  color: var(--meta);
+  display: grid;
+  place-items: center;
+}
+.ov .ph .x:hover {
+  background: var(--muted);
+  color: var(--fg);
+}
+.ov .body {
+  overflow: auto;
+  padding: 32px 40px;
+}
+.rp h1 {
+  font-size: 22px;
+  margin: 0 0 14px;
+  letter-spacing: -0.02em;
+}
+.rp .meta {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 4px 8px;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+.rp .meta span:nth-child(odd) {
+  color: var(--meta);
+}
+.rp .meta span:nth-child(even) {
+  font-weight: 600;
+}
+.rp .nums {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-strong);
+}
+.rp .nums div {
+  font-size: 13px;
+  color: var(--meta);
+}
+.rp .nums b {
+  display: block;
+  font-size: 24px;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+}
+.rp .row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.rp .row .h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.rp .row .h span {
+  color: var(--meta);
+  font-weight: 500;
+  margin-left: auto;
+}
+.rp .row .ab {
+  white-space: pre-line;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+.rp .row .ab > div:first-child {
+  border-right: 1px solid var(--border);
+  padding-right: 24px;
+}
+.rp .row .ab i {
+  display: block;
+  font-style: normal;
+  color: var(--meta);
+  font-weight: 600;
+  font-size: 13px;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.rp .foot {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--meta);
+  break-before: avoid;
+}
+.dd {
+  position: relative;
+}
+.dd .menu {
+  position: absolute;
+  right: 0;
+  top: 46px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px oklch(0 0 0/0.12);
+  padding: 6px;
+  min-width: 160px;
+  z-index: 2;
+}
+.dd .menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+.dd .menu button:hover {
+  background: var(--muted);
+}
+/* PDF export: print only the report, paginated by the browser. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  #root > * {
+    display: none;
+  }
+  #root > .ov {
+    display: block;
+    position: static;
+    padding: 0;
+    background: none;
+  }
+  .ov .panel {
+    height: auto;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .ov .ph {
+    display: none;
+  }
+  .ov .body {
+    overflow: visible;
+    padding: 0;
+  }
+  .rp .row {
+    break-inside: avoid;
+  }
+}
+.ov .ph .opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--meta);
+  margin-right: 8px;
+}
+.ov .ph .opt select {
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 0 6px;
+  font: inherit;
+  color: var(--fg);
+}

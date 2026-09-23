@@ -5,7 +5,6 @@ export const TIER_CLASS: Record<Tier, string> = { near: 't1', edited: 't2' }
 
 export type CompareFilter = 'all' | Tier
 export type RepeatFilter = 'all' | 3 | 5
-export type Filter = CompareFilter | RepeatFilter
 
 export function filterMatches(matches: ChapterMatch[], f: CompareFilter): ChapterMatch[] {
   return f === 'all' ? matches : matches.filter((m) => m.tier === f)

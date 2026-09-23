@@ -38,7 +38,7 @@ Svelte (smaller bundle, different from the team standard).
 - **Tailwind dropped.** The accepted mockup
   (`docs/mockups/2026-09-21-similarity-check/index.html`) had to be matched
   pixel for pixel; its stylesheet was moved verbatim into
-  `src/app/styles.css` instead of being re-expressed in utility classes.
+  `src/app/styles.css` (since split by screen into `src/app/styles/`) instead of being re-expressed in utility classes.
 - **PDF export uses the browser print dialog.** jsPDF + html2canvas produced
   a blank multi-page PDF because a full report exceeds the canvas height
   limit. Printing keeps selectable Korean text and real pagination, so `jspdf`

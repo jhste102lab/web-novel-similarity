@@ -16,7 +16,7 @@ const build = createHash('sha256').update(assets.join('|')).digest('hex').slice(
 const filled = source
   .replace("/*PRECACHE*/ ['']", JSON.stringify(['', ...assets]))
   // A per-build cache name makes activate() drop the previous build instead of keeping both.
-  .replace("'novel-similarity-v1'", `'novel-similarity-${build}'`)
+  .replace("'web-novel-similarity-v1'", `'web-novel-similarity-${build}'`)
 if (filled === source) throw new Error("sw.js has no /*PRECACHE*/ [''] placeholder")
 writeFileSync(sw, filled)
-console.log(`sw.js precaches ${assets.length + 1} files as novel-similarity-${build}`)
+console.log(`sw.js precaches ${assets.length + 1} files as web-novel-similarity-${build}`)

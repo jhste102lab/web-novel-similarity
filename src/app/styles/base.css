@@ -1,0 +1,169 @@
+/* Tokens, reset, header, buttons, modal and marks shared by every screen. Ported from the accepted mockup (docs/mockups). */
+:root {
+  --font:
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --bg: oklch(0.975 0.006 264.5);
+  --card: #fff;
+  --fg: oklch(0.24 0.02 265);
+  --meta: oklch(0.5 0.025 265);
+  --muted: oklch(0.955 0.01 264);
+  --border: oklch(0.9 0.012 264);
+  --border-strong: oklch(0.82 0.02 264);
+  --t1: oklch(0.52 0.21 26);
+  --t2: oklch(0.55 0.13 66);
+  --hl: oklch(0.95 0.06 80);
+  --radius: 12px;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+.top {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.logo {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+.top .r {
+  display: flex;
+  gap: 8px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  background: var(--muted);
+  transition: background 0.12s;
+}
+.btn:hover {
+  background: oklch(0.92 0.012 264);
+}
+.btn.primary {
+  background: var(--fg);
+  color: #fff;
+}
+.btn.primary:hover {
+  background: oklch(0.34 0.02 265);
+}
+.btn.primary:disabled {
+  background: var(--muted);
+  color: var(--meta);
+  cursor: default;
+}
+.btn.lg {
+  height: 52px;
+  padding: 0 40px;
+  font-size: 16px;
+  border-radius: 14px;
+}
+.btn.text {
+  background: none;
+  color: var(--meta);
+  padding: 0 10px;
+}
+.btn.text:hover {
+  color: var(--fg);
+  background: none;
+}
+.gh {
+  display: inline-flex;
+  margin-left: 10px;
+  color: var(--meta);
+  vertical-align: middle;
+}
+.gh:hover {
+  color: var(--fg);
+}
+.gh svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.modal {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0/0.4);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+.modal .box {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 28px 28px 20px;
+  width: 360px;
+}
+.modal h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+.modal p {
+  margin: 0 0 22px;
+  color: var(--meta);
+}
+.modal .acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  display: inline-block;
+}
+.t1 {
+  background: var(--t1);
+}
+.t2 {
+  background: var(--t2);
+}
+mark {
+  background: var(--hl);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

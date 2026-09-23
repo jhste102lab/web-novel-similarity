@@ -1,7 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css'
-import './app/styles.css'
+import './app/styles/base.css'
+import './app/styles/start.css'
+import './app/styles/analyzing.css'
+import './app/styles/results.css'
+import './app/styles/export.css'
 import { App } from './app/App.tsx'
 
 createRoot(document.getElementById('root')!).render(

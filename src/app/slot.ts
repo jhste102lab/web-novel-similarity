@@ -64,12 +64,12 @@ export function slotEngineText(slot: Slot): ManuscriptText {
   })
 }
 
-export function totalChars(slot: Slot): number {
+function totalChars(slot: Slot): number {
   return slot.manuscript.parts.reduce((n, p) => n + p.text.length, 0)
 }
 
 /** "198만 자" above 10,000 characters, "3,812자" below. */
-export function formatChars(n: number): string {
+function formatChars(n: number): string {
   return n >= 10_000 ? `${Math.round(n / 10_000)}만 자` : `${n.toLocaleString()}자`
 }
 

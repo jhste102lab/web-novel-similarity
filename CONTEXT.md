@@ -1,4 +1,4 @@
-# novel-similarity — Domain Context
+# web-novel-similarity — Domain Context
 
 Browser-only web tool that finds reused or lightly edited sentences between two
 web-novel manuscripts, or repeated sentences inside one manuscript. It is a
@@ -61,8 +61,8 @@ Product (2026-09-21, mockup accepted):
 - Visual language: NovelTrack tokens (Pretendard Variable, near-white
   background, white cards). No gradients, no glass, no explanatory copy.
 - Header product name: `웹소설 문장 · 문단 유사도 검사`.
-- Future public repository name: `web-novel-similarity`. Change the
-  Vite `base` from `/novel-similarity/` only when that repository is created.
+- Public repository: `jhste102lab/web-novel-similarity`, served from
+  GitHub Pages at `/web-novel-similarity/` (Vite `base`).
 
 Engineering (2026-09-21, ADR 0002–0004):
 
@@ -73,6 +73,17 @@ Engineering (2026-09-21, ADR 0002–0004):
 - Tier thresholds tuned on a fully synthetic, committed benchmark corpus.
 - Export: PNG via `html2canvas-pro`, PDF via the browser print dialog
   (ADR 0003 amendment).
+
+Review (2026-09-22, after hands-on use):
+
+- Findings stream in while the scan runs; 중단 keeps what was scanned.
+- A 유사 구간 never crosses a 회차 boundary, so a work copied wholesale shows
+  one 회차 쌍 per copied 회차. Rows count matched sentences (`유사 문장 N개`),
+  the detail adds the passage count (`구간 N개`).
+- Review aids: search box, per-passage `문장 복사`, keyboard (`j`/`k`, `/`,
+  `c`, `d`, `?`), a diagnostics panel with phase timings.
+- Export option: passages per 회차 쌍 (전체 / 5 / 1).
+- Works offline after the first visit (service worker); no chapter-map view.
 
 ## Open decisions
 

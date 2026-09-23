@@ -1,0 +1,336 @@
+/* Result review: windowed list, detail pane, search, copy, HUD panels. */
+.bar-top .title .rng {
+  color: var(--meta);
+  font-weight: 500;
+  font-size: 13px;
+  margin-left: 12px;
+}
+.results {
+  height: calc(100vh - 56px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+.bar-top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 28px;
+  height: 56px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.bar-top .title {
+  font-weight: 700;
+  font-size: 16px;
+}
+.bar-top .title span {
+  color: var(--meta);
+  font-weight: 400;
+  margin: 0 8px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.tab {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--meta);
+  font-weight: 500;
+}
+.tab:hover {
+  background: var(--muted);
+}
+.tab.on {
+  background: var(--fg);
+  color: #fff;
+}
+.tab b {
+  font-weight: 700;
+}
+.split {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  min-height: 0;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--card);
+}
+.list {
+  background: var(--card);
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+.empty-results {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  min-height: 360px;
+  color: var(--meta);
+  font-size: 16px;
+  font-weight: 600;
+  background: var(--card);
+}
+.item {
+  display: flex;
+  gap: 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  /* Fixed so the list can be windowed; ROW_H in ResultsShell.tsx must match. */
+  height: 75px;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: background-color 120ms ease;
+}
+.item:hover {
+  background: var(--bg);
+}
+.item.on {
+  background: var(--muted);
+}
+.item .dot {
+  margin-top: 7px;
+  flex: none;
+}
+.item .b {
+  flex: 1;
+  min-width: 0;
+}
+.item .pos {
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+}
+.item .pos span {
+  color: var(--meta);
+  font-weight: 500;
+}
+.item .ex {
+  color: var(--meta);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.detail {
+  overflow: auto;
+  padding: 28px 40px;
+}
+.detail .head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.detail .head .pct {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.detail .head .tier {
+  font-weight: 600;
+}
+.detail .head .where {
+  color: var(--meta);
+  margin-left: auto;
+}
+/* In the repeat header the copy button sits beside the count, so the span keeps the right edge. */
+.detail .head .copy {
+  margin-left: 0;
+}
+.cmp {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.detail .cmp + .cmp {
+  margin-top: 16px;
+}
+.pane {
+  white-space: pre-line;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  font-size: 15px;
+  line-height: 1.9;
+}
+.pane .k {
+  display: flex;
+  white-space: normal;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--meta);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.pane .k b {
+  color: var(--fg);
+}
+.occ {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 20px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.occ .ch {
+  flex: none;
+  width: 56px;
+  font-weight: 600;
+}
+.tabs .find {
+  height: 32px;
+  width: 150px;
+  padding: 0 10px;
+  margin-right: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  outline: none;
+}
+.tabs .find:focus {
+  border-color: var(--fg);
+}
+.results:focus {
+  outline: none;
+}
+.copy {
+  margin-left: auto;
+  flex: none;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--meta);
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.copy:hover {
+  background: var(--muted);
+  color: var(--fg);
+}
+.copy.done {
+  color: #15803d;
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+.scanning {
+  position: relative;
+  font-size: 13px;
+  color: var(--meta);
+  font-variant-numeric: tabular-nums;
+  padding-bottom: 6px;
+}
+.scanning i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--fg);
+  border-radius: 1px;
+  transition: width 200ms linear;
+}
+.bar-top .title .rng.stop {
+  color: var(--t1);
+}
+.hud {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  min-width: 260px;
+}
+.hud .ph {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 700;
+}
+.hud .ph .x {
+  color: var(--meta);
+  font-size: 15px;
+  line-height: 1;
+}
+.hud table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.hud th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--meta);
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+.hud td {
+  text-align: right;
+  padding: 4px 12px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+.hud tr:last-child td,
+.hud tr:last-child th {
+  padding-bottom: 10px;
+}
+.hud kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--fg);
+}
+.help {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--meta);
+  font-weight: 700;
+  opacity: 0.55;
+}
+.help:hover {
+  opacity: 1;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  background: var(--fg);
+  color: var(--card);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  z-index: 40;
+}

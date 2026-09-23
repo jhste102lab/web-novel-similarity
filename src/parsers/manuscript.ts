@@ -68,7 +68,7 @@ export function toEngineText(m: Manuscript): ManuscriptText {
 }
 
 /** Second non-empty line of a chapter (the first is its title), trimmed for the row label. */
-export function firstSentence(text: string): string {
+function firstSentence(text: string): string {
   const lines = text
     .split('\n')
     .map((l) => l.trim())

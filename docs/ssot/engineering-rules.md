@@ -12,6 +12,7 @@ src/
   parsers/     file → { text, chapters }. One file per format (txt, docx, hwpx). No UI.
   worker/      Web Worker entry; owns the message protocol; calls engine + parsers.
   app/         React: screens, components, hooks. Talks to the worker only through `worker/client.ts`.
+  app/styles/  one stylesheet per screen (base, start, analyzing, results, export incl. print), imported in order by `main.tsx`.
   export/      report DOM → PDF/PNG.
   shared/      types and constants used by more than one layer.
 bench/         synthetic corpus generator and threshold report (Node scripts).
@@ -30,13 +31,13 @@ bench/         synthetic corpus generator and threshold report (Node scripts).
 - No comments that restate code. A comment explains a non-obvious constraint or a measured number. Deliberate shortcuts are marked `// ponytail: <ceiling>, <upgrade path>`.
 - No speculative abstractions: no interface with one implementation, no config for values that never change, no "utils" grab-bag.
 - Delete dead code in the same change that makes it dead. No commented-out code, no `TODO` without an issue link.
-- Formatting and linting are enforced by tooling (Prettier + ESLint, config in repo); never format by hand in a review.
+- Formatting and linting are enforced by tooling (Prettier + oxlint, config in repo; `npm run lint` runs both); never format by hand in a review.
 
 ## Hot paths (engine)
 
 - Sentences are indexed once into typed arrays (`Uint32Array` offsets, `Uint32Array` hashes). No per-sentence objects inside loops.
 - Candidate retrieval runs before any precise comparison; all-pairs comparison is a bug.
-- Progress is reported from the worker at most every 100 ms.
+- Progress is reported every `PROGRESS_EVERY` query sentences; streamed findings at most every `PARTIAL_EVERY_MS`.
 - Every algorithm is a named function with a doc comment citing the public algorithm (Rabin–Karp, winnowing, Myers) so a reader can verify it against the literature.
 
 ## Testing

@@ -9,8 +9,6 @@ export class UnsupportedFormatError extends Error {
   }
 }
 
-export const SUPPORTED_EXTENSIONS = ['txt', 'docx', 'hwpx'] as const
-
 /** Text of one manuscript file. Throws UnsupportedFormatError for anything but txt/docx/hwpx. */
 export async function parseFile(name: string, bytes: ArrayBuffer): Promise<string> {
   const ext = name.slice(name.lastIndexOf('.') + 1).toLowerCase()

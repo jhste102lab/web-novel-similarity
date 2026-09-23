@@ -6,7 +6,7 @@ import { MAX_POSTINGS, NGRAM, WINDOW } from '../shared/constants.ts'
  * WINDOW consecutive hashes. Guarantees any shared substring of length
  * NGRAM + WINDOW - 1 yields at least one shared fingerprint.
  */
-export function winnow(norm: string): number[] {
+function winnow(norm: string): number[] {
   const n = norm.length
   if (n < NGRAM) return n === 0 ? [] : [hashRange(norm, 0, n)]
   const hashes = new Uint32Array(n - NGRAM + 1)

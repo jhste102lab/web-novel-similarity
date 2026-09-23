@@ -18,12 +18,11 @@ document in the same change.
 
 ## Current SSOT
 
-| Scope                                                                | Document                                    |
-| -------------------------------------------------------------------- | ------------------------------------------- |
-| Terms, chapter detection, product decisions                          | `CONTEXT.md`                                |
-| Module map, worker protocol, result types, thresholds location       | `docs/ssot/architecture.md`                 |
-| Code style, module boundaries, testing, dependency policy            | `docs/ssot/engineering-rules.md`            |
-| Accepted UI behaviour (until the app exists, the mockup is the spec) | `docs/mockups/2026-09-21-similarity-check/` |
+| Scope                                                        | Document                         |
+| ------------------------------------------------------------ | -------------------------------- |
+| Terms, chapter detection, product decisions                  | `CONTEXT.md`                     |
+| File map, worker protocol, result types, thresholds location | `docs/ssot/architecture.md`      |
+| Code style, module boundaries, testing, dependency policy    | `docs/ssot/engineering-rules.md` |
 
 ## Directory status
 

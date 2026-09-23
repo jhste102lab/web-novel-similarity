@@ -1,7 +1,7 @@
 // Offline cache. The app never talks to a server at runtime, so "works with the network off"
 // is the honest test of that claim. The build fills PRECACHE and CACHE with this build's hashed
 // file names (scripts/sw-precache.ts); fonts and anything else are cached as they are requested.
-const CACHE = 'novel-similarity-v1'
+const CACHE = 'web-novel-similarity-v1'
 /** Paths relative to the app root; '' is the HTML shell. */
 const PRECACHE = /*PRECACHE*/ ['']
 const ROOT = new URL('./', location.href)

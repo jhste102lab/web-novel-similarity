@@ -1,0 +1,63 @@
+/* Progress screen shown until the first findings arrive. */
+.abort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 12px;
+  border: 1.5px solid var(--t1);
+  color: var(--t1);
+  font-weight: 700;
+  font-size: 15px;
+}
+.abort:hover {
+  background: var(--t1);
+  color: #fff;
+}
+.abort svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.analyzing {
+  max-width: 480px;
+  margin: 140px auto 0;
+  text-align: center;
+}
+.analyzing h2 {
+  font-size: 22px;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+.analyzing p {
+  color: var(--meta);
+  margin: 0 0 28px;
+}
+.bar {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--muted);
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--fg);
+  border-radius: 99px;
+  transition: width 0.2s;
+}
+.analyzing .pct {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 14px 0 24px;
+  letter-spacing: -0.02em;
+}
+.analyzing .elapsed {
+  color: var(--meta);
+  font-size: 13px;
+  margin-top: 4px;
+}

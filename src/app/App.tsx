@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { CompareReport, RepeatReport } from '../export/Report.tsx'
+import { MAX_PASSAGES_PER_MATCH } from '../shared/constants.ts'
 import type { CompareResult, RepeatResult } from '../shared/types.ts'
 import { runInWorker, type Run } from '../worker/client.ts'
 import { AnalyzingScreen } from './AnalyzingScreen.tsx'
 import { ExportOverlay } from './ExportOverlay.tsx'
 import { Modal, type ModalProps } from './Modal.tsx'
-import { CompareView, RepeatView } from './ResultsScreen.tsx'
+import { RepeatView } from './RepeatView.tsx'
+import { CompareView } from './CompareView.tsx'
 import { filterGroups, filterMatches, type CompareFilter, type RepeatFilter } from './results.ts'
 import {
   loadSlot,
@@ -46,11 +48,12 @@ export function App() {
   })
   const [screen, setScreen] = useState<Screen>({ kind: 'start' })
   const [modal, setModal] = useState<Omit<ModalProps, 'onNo'> | null>(null)
-  const [filter, setFilter] = useState<CompareFilter | RepeatFilter>('all')
+  const [compareFilter, setCompareFilter] = useState<CompareFilter>('all')
+  const [repeatFilter, setRepeatFilter] = useState<RepeatFilter>('all')
   const [selected, setSelected] = useState(0)
   const [exporting, setExporting] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
-  const [perMatch, setPerMatch] = useState(20)
+  const [perMatch, setPerMatch] = useState(MAX_PASSAGES_PER_MATCH)
 
   const setSlot = (key: Key, view: SlotView): void => setSlots((s) => ({ ...s, [key]: view }))
 
@@ -104,7 +107,8 @@ export function App() {
           onPartial,
         )
     setRunError(null)
-    setFilter('all')
+    setCompareFilter('all')
+    setRepeatFilter('all')
     setSelected(0)
     setScreen({ kind: 'analyzing', run, pct: 0, two: b !== null })
     run.result.then(
@@ -135,7 +139,6 @@ export function App() {
     })
 
   const results = screen.kind === 'results' ? screen : null
-  const isCompare = results?.result.kind === 'compare'
 
   return (
     <>
@@ -222,9 +225,9 @@ export function App() {
             rangeNote={rangeNote(results.a, results.b)}
             running={results.run !== null}
             stopped={results.stopped ?? false}
-            filter={filter as CompareFilter}
+            filter={compareFilter}
             onFilter={(f) => {
-              setFilter(f)
+              setCompareFilter(f)
               setSelected(0)
             }}
             selected={selected}
@@ -237,9 +240,9 @@ export function App() {
             titleA={results.a.title}
             running={results.run !== null}
             stopped={results.stopped ?? false}
-            filter={filter as RepeatFilter}
+            filter={repeatFilter}
             onFilter={(f) => {
-              setFilter(f)
+              setRepeatFilter(f)
               setSelected(0)
             }}
             selected={selected}
@@ -253,11 +256,11 @@ export function App() {
           fileName={`유사도 검사 ${today()}`}
           onClose={() => setExporting(false)}
           options={
-            isCompare && (
+            results.result.kind === 'compare' && (
               <label className="opt">
                 회차당 문장
                 <select value={perMatch} onChange={(e) => setPerMatch(Number(e.target.value))}>
-                  <option value={20}>전체</option>
+                  <option value={MAX_PASSAGES_PER_MATCH}>전체</option>
                   <option value={5}>5개</option>
                   <option value={1}>1개</option>
                 </select>
@@ -265,25 +268,22 @@ export function App() {
             )
           }
         >
-          {isCompare ? (
+          {results.result.kind === 'compare' ? (
             <CompareReport
               meta={{
                 date: today(),
                 a: manuscriptLine(results.a),
                 b: results.b ? manuscriptLine(results.b) : undefined,
               }}
-              all={(results.result as CompareResult).matches}
-              rows={filterMatches(
-                (results.result as CompareResult).matches,
-                filter as CompareFilter,
-              )}
+              all={results.result.matches}
+              rows={filterMatches(results.result.matches, compareFilter)}
               perMatch={perMatch}
             />
           ) : (
             <RepeatReport
               meta={{ date: today(), a: manuscriptLine(results.a) }}
-              all={(results.result as RepeatResult).groups}
-              rows={filterGroups((results.result as RepeatResult).groups, filter as RepeatFilter)}
+              all={results.result.groups}
+              rows={filterGroups(results.result.groups, repeatFilter)}
             />
           )}
         </ExportOverlay>
