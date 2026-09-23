@@ -1,7 +1,7 @@
 # 0001 — All manuscript processing stays in the browser
 
 Status: Accepted. Engine language amended by ADR 0002; the JSON save/reopen
-and live network counter below were dropped during mockup review (see
+and live network counter below were dropped during design review (see
 `CONTEXT.md`, Settled decisions).
 
 ## Context

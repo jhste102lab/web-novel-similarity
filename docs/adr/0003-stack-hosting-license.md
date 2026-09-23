@@ -35,8 +35,8 @@ Svelte (smaller bundle, different from the team standard).
 
 ## Amendments (2026-09-21, implementation)
 
-- **Tailwind dropped.** The accepted mockup
-  (`docs/mockups/2026-09-21-similarity-check/index.html`) had to be matched
+- **Tailwind dropped.** The accepted HTML mockup
+  (since removed from the repository) had to be matched
   pixel for pixel; its stylesheet was moved verbatim into
   `src/app/styles.css` (since split by screen into `src/app/styles/`) instead of being re-expressed in utility classes.
 - **PDF export uses the browser print dialog.** jsPDF + html2canvas produced

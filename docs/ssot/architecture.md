@@ -69,7 +69,7 @@ Where to look first for a given change. Tests sit next to their module.
 Scale target: 500 chapters × 4,000 chars per side (≈ 2M chars), ≤ 5 s.
 Measured: ~1.5–1.7 s in Node and ~3.6 s end to end in Chrome including parsing
 and rendering, with the first findings on screen after ~0.8 s
-(`docs/plan/2026-09-21-benchmark.md`).
+(`docs/benchmark.md`).
 
 ## Worker protocol
 
@@ -144,7 +144,7 @@ by the engine, so there is no "noise" filter to switch off.
 ## Thresholds
 
 All in `src/shared/constants.ts`; rationale in
-`docs/plan/2026-09-21-benchmark.md`.
+`docs/benchmark.md`.
 
 | Constant                                   | Meaning                                  | Value                 |
 | ------------------------------------------ | ---------------------------------------- | --------------------- |

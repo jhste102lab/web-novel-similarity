@@ -1,4 +1,4 @@
-// Usage: node bench/run.ts [--report docs/plan/YYYY-MM-DD-benchmark.md]
+// Usage: node bench/run.ts [--report docs/benchmark.md]
 import { writeFileSync } from 'node:fs'
 import { compare, tierOf } from '../src/engine/compare.ts'
 import { similarity } from '../src/engine/editDistance.ts'

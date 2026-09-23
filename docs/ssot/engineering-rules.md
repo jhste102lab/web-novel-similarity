@@ -45,7 +45,7 @@ bench/         synthetic corpus generator and threshold report (Node scripts).
 - Unit tests with Vitest next to the module (`*.test.ts`). Test observable behaviour: given text, expected passages/tiers; given a filename set, expected chapters.
 - One test earns its place only if a plausible bug would fail it. No tests for wiring, defaults or forwarding.
 - Fixtures are synthetic (ADR 0004). No real manuscript text in the repository, including in bug reports.
-- `bench/` is not part of `npm test`; it is run manually and its report is committed under `docs/plan/`.
+- `bench/` is not part of `npm test`; it is run manually and its report is committed as `docs/benchmark.md`.
 
 ## Dependencies
 

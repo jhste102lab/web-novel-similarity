@@ -44,11 +44,11 @@ decided". If they disagree, fix the document in the same change.
 - `src/engine/` and `src/parsers/` have no DOM or React imports and are
   tested by input/output only.
 - Every UI string is Korean. Wording and visible settings follow the
-  shipped app and `CONTEXT.md`; the mockup is history. No explanatory copy,
+  shipped app and `CONTEXT.md`; no mockup is kept. No explanatory copy,
   no settings the owner has not accepted.
 - Dependencies outside the table in `docs/ssot/engineering-rules.md` are not
   added without updating that table.
-- Thresholds change only together with a benchmark report in `docs/plan/`.
+- Thresholds change only together with an updated `docs/benchmark.md` (`npm run bench`).
 
 ## Done criteria
 

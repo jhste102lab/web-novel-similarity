@@ -39,7 +39,7 @@ row. After four consecutive corrected values the card offers
 
 ## Settled decisions
 
-Product (2026-09-21, mockup accepted):
+Product (2026-09-21, design accepted):
 
 - Modes: `A/B 비교` and `내부 반복`, chosen by one switch. No preset or
   sensitivity setting; the result tabs are the sensitivity control.
@@ -68,8 +68,8 @@ Engineering (2026-09-21, ADR 0002–0004):
 
 - Engine in TypeScript inside a Web Worker first; Rust/WASM only if measured
   too slow or when the desktop build happens.
-- React + Vite + TypeScript; npm; MIT; GitHub Pages via Actions. The mockup
-  stylesheet is used verbatim (no Tailwind — ADR 0003 amendment).
+- React + Vite + TypeScript; npm; MIT; GitHub Pages via Actions. The accepted
+  design's stylesheet is used verbatim (no Tailwind — ADR 0003 amendment).
 - Tier thresholds tuned on a fully synthetic, committed benchmark corpus.
 - Export: PNG via `html2canvas-pro`, PDF via the browser print dialog
   (ADR 0003 amendment).

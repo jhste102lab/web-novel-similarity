@@ -1,5 +1,5 @@
 // Every tunable number of the engine. Tier thresholds change only together
-// with a benchmark report (docs/plan/). See docs/ssot/architecture.md.
+// with an updated benchmark report (docs/benchmark.md). See docs/ssot/architecture.md.
 
 /** Sentences shorter than this (after normalisation) are not indexed. */
 export const MIN_SENTENCE_CHARS = 8
