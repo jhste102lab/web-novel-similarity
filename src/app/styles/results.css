@@ -255,7 +255,8 @@
   position: fixed;
   right: 20px;
   bottom: 20px;
-  z-index: 30;
+  /* Below the export overlay and confirm dialog (20), which must cover it. */
+  z-index: 10;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;

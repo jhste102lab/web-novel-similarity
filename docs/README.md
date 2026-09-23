@@ -32,6 +32,7 @@ document in the same change.
 | `docs/adr/`                | Decision   | Accepted decisions and their context; amend by adding a new ADR |
 | `docs/mockups/`            | Historical | Design mockups reviewed with the owner                          |
 | `docs/plan/`               | Historical | Plans, handoffs, benchmark reports                              |
+| `docs/images/`             | Current    | README screenshots of the synthetic sample manuscripts          |
 
 ## Update rules by change type
 
@@ -42,5 +43,6 @@ document in the same change.
 | Tier threshold                                  | `docs/ssot/architecture.md` and the benchmark report in `docs/plan/` |
 | New dependency                                  | `docs/ssot/engineering-rules.md` (dependency table)                  |
 | Decision with alternatives                      | new `docs/adr/NNNN-*.md`                                             |
+| Visible UI change shown in a README screenshot  | recapture it in `docs/images/` (1440×900, synthetic manuscripts)     |
 
 A rule lives in exactly one document; other documents link to it.
