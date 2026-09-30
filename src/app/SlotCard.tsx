@@ -65,6 +65,9 @@ function EmptyCard({ slotKey, error, loading, hint, onFiles }: Props) {
           e.target.value = ''
         }}
       />
+      <svg className="drop" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" />
+      </svg>
       <div className="name">원고 {slotKey}</div>
       <div className="fmt">{hint}</div>
       {error && <div className="err">{error}</div>}
