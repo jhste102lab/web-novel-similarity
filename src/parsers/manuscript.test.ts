@@ -10,10 +10,10 @@ describe('buildManuscript', () => {
     expect(m.parts[0]!.text).toContain('별이 졌다.')
   })
 
-  it('splits files that each hold several titled chapters', () => {
+  it('splits files that each hold several titled chapters, in title order', () => {
     const m = buildManuscript([
-      file('검은달 3_4.txt', '3화\n셋\n4화\n넷'),
-      file('검은달 1_2.txt', '1화\n하나\n2화\n둘'),
+      file('검은달 뒤.txt', '3화\n셋\n4화\n넷'),
+      file('검은달 앞.txt', '1화\n하나\n2화\n둘'),
     ])
     expect(m.rule).toBe('title-lines')
     expect(m.files).toBe(2)

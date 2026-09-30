@@ -32,10 +32,16 @@ export function buildManuscript(files: ParsedFile[]): Manuscript {
   // Reading order, not input order: the fallback title must not depend on how files were picked.
   const title = commonTitle(sorted.map((s) => s.file.name))
   // Files that each hold several titled chapters ("1-100화.hwp", "101-200화.hwp") are split
-  // by those titles; a file number would label a hundred chapters as one.
-  const titled = sorted.map((s) => chaptersFromTitles(s.file.text).chapters)
-  if (titled.every((chapters) => chapters.length > 0)) {
-    const parts = sorted.flatMap((s, i) => titleParts(s.file.text, titled[i]!))
+  // by those titles; a file number would label a hundred chapters as one. Files go in the
+  // order of their first title (file order on ties, e.g. 1부/2부 both starting at 1화).
+  const titled = sorted.map((s) => ({
+    file: s.file,
+    chapters: chaptersFromTitles(s.file.text).chapters,
+  }))
+  if (titled.every((t) => t.chapters.length > 0)) {
+    const parts = titled
+      .sort((x, y) => x.chapters[0]!.label! - y.chapters[0]!.label!)
+      .flatMap((t) => titleParts(t.file.text, t.chapters))
     return { title, rule: 'title-lines', files: files.length, parts }
   }
   const parts = sorted.map(({ file, label }) => ({

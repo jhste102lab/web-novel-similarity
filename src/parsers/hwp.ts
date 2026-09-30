@@ -1,5 +1,18 @@
+import type * as Rhwp from '@rhwp/core'
+
 /** The document is password-protected; only 한글 can open it. */
 export class EncryptedFileError extends Error {}
+
+// rhwp's init() only short-circuits once it has finished, so two slots loading HWP 5 at the
+// same time would fetch and compile the WASM twice. A failed load is retried next time.
+let loading: Promise<typeof Rhwp> | undefined
+
+async function loadRhwp(): Promise<typeof Rhwp> {
+  // Dynamic import: the WASM is fetched only when an HWP 5 file is dropped, like mammoth for .docx.
+  const rhwp = await import('@rhwp/core')
+  await rhwp.default()
+  return rhwp
+}
 
 /**
  * HWP 5 binary (an OLE compound file, whatever the extension says) via rhwp's WASM build,
@@ -7,9 +20,11 @@ export class EncryptedFileError extends Error {}
  * GetTextFile("UNICODE"): body and table cells in reading order, footnotes left out.
  */
 export async function extractHwpText(bytes: ArrayBuffer): Promise<string> {
-  // Dynamic import: the WASM is fetched only when an HWP 5 file is dropped, like mammoth for .docx.
-  const rhwp = await import('@rhwp/core')
-  await rhwp.default()
+  loading ??= loadRhwp().catch((err: unknown) => {
+    loading = undefined
+    throw err
+  })
+  const rhwp = await loading
   let doc
   try {
     doc = new rhwp.HwpDocument(new Uint8Array(bytes))
