@@ -43,7 +43,7 @@ export function StartScreen({
       </div>
       <h1>원고를 올려 주세요</h1>
       <div className="sub">
-        올려주신 파일은 사용자의 브라우저로만 처리되며 외부 서버로 전송되지 않습니다.
+        업로드된 파일은 외부 서버로 전송되지 않으며, 사용자의 브라우저 내에서만 처리됩니다.
       </div>
       <div className={`slots ${two ? '' : 'one'}`}>
         <SlotCard

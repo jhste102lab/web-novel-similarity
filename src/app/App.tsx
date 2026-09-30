@@ -95,6 +95,12 @@ export function App() {
     return () => window.removeEventListener('beforeunload', ask)
   }, [unsaved])
 
+  // While dropped files are read, the pointer spins everywhere, not only over the card.
+  const reading = slots.A.loading !== undefined || slots.B.loading !== undefined
+  useEffect(() => {
+    document.documentElement.classList.toggle('busy', reading)
+  }, [reading])
+
   const setSlot = (key: Key, view: SlotView): void => setSlots((s) => ({ ...s, [key]: view }))
 
   const onFiles = async (key: Key, files: File[]): Promise<void> => {

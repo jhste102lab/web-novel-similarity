@@ -17,6 +17,10 @@
 * {
   box-sizing: border-box;
 }
+html.busy,
+html.busy * {
+  cursor: progress !important;
+}
 html,
 body {
   margin: 0;

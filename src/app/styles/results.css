@@ -201,12 +201,17 @@
 .detail .cmp.chs + .blk {
   margin-top: 8px;
 }
-/* Stretches linked by findings: rows close together, blocks apart. */
+/* One A stretch beside every B stretch it matched; blocks apart. */
+.detail .blk {
+  align-items: start;
+}
 .detail .blk + .blk {
   margin-top: 28px;
 }
-.detail .blk .cmp + .cmp {
-  margin-top: 8px;
+.detail .blk .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .pane .lnk {
   white-space: normal;

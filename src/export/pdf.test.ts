@@ -38,12 +38,8 @@ describe('renderPdf', () => {
           a: 'a.txt · 1화',
           b: 'b.txt · 1화',
           tier: 'near',
-          blocks: [
-            [
-              { a: side(long), b: side(long) },
-              { a: side('겹친다.', '1화 · 9번째 문장'), b: side('겹친다.', '1화 · 9번째 문장') },
-            ],
-          ],
+          // A long B box running over pages, then a short B box stacked under it.
+          blocks: [{ a: side(long), b: [side(long), side('겹친다.', '1화 · 9번째 문장')] }],
         },
       ],
     }
@@ -54,16 +50,16 @@ describe('renderPdf', () => {
     const footers = r.texts.filter((t) => / \/ \d+$/.test(t.t)).map((t) => t.t)
     expect(footers).toEqual(Array.from({ length: pages }, (_, i) => `${i + 1} / ${pages}`))
     expect(r.texts.filter((t) => t.t.endsWith('(계속)'))).toHaveLength(pages - 1)
-    // Each box's heading: its label and the other side's sentences, once per box.
-    const labels = r.texts.filter((t) => t.t.endsWith('번째 문장'))
-    expect(labels.map((t) => t.t).sort()).toEqual(
-      [
-        ...Array<string>(2).fill('1화 · 1번째 문장'),
-        ...Array<string>(2).fill('↔ B 6·30번째 문장'),
-        ...Array<string>(2).fill('1화 · 9번째 문장'),
-        ...Array<string>(2).fill('↔ B 6·30번째 문장'),
-      ].sort(),
-    )
+    // Each box's heading, once per box and in drawing order: A, the first B, then the B under it.
+    const labels = r.texts.filter((t) => t.t.endsWith('번째 문장')).map((t) => t.t)
+    expect(labels).toEqual([
+      '1화 · 1번째 문장',
+      '↔ B 6·30번째 문장',
+      '1화 · 1번째 문장',
+      '↔ B 6·30번째 문장',
+      '1화 · 9번째 문장',
+      '↔ B 6·30번째 문장',
+    ])
     // Nothing runs past the right margin (A4 width minus 40 pt) or into the footer rule.
     for (const t of r.texts) {
       expect(t.x + [...t.t].length * 0.6 * t.size).toBeLessThanOrEqual(595.28 - 40 + 0.01)

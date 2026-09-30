@@ -15,7 +15,7 @@ const span = (m: ManuscriptText, ls: string[], i: number): Span => {
 }
 
 describe('blocksOf', () => {
-  it('puts every box beside what it matched and shows each stretch whole only once', () => {
+  it('shows each A stretch once, every B stretch it matched whole beside it', () => {
     const la = lines('가')
     const lb = lines('나')
     const A = doc(la)
@@ -25,7 +25,7 @@ describe('blocksOf', () => {
       a: span(A, la, a),
       b: span(B, lb, b),
     })
-    // A 2 matches B 30 (late in B); A 20 matches B 5 and B 30; A 2 and A 4 share neighbours.
+    // A 2 and A 4 share neighbours; A 20 matches B 5 and B 30, which A 2 matched too.
     const blocks = blocksOf(
       [p(20, 5), p(2, 30), p(20, 30), p(4, 31)],
       joinOf(A),
@@ -33,17 +33,26 @@ describe('blocksOf', () => {
       () => 'a.txt',
       () => 'b.txt',
     )
-    expect(blocks).toHaveLength(1)
-    const rows = blocks[0]!.map((r) => [r.a.label, r.b.label])
-    expect(rows).toEqual([
-      ['a.txt · 1화 · 3·5번째 문장', 'b.txt · 1화 · 31·32번째 문장'],
-      ['a.txt · 1화 · 21번째 문장', 'b.txt · 1화 · 6번째 문장'],
-      // Both stretches were shown above: only the sentences this row links.
-      ['a.txt · 1화 · 21번째 문장', 'b.txt · 1화 · 31번째 문장'],
+    const shape = blocks.map((k) => [k.a.label, k.a.link, k.b.map((s) => [s.label, s.link])])
+    expect(shape).toEqual([
+      [
+        'a.txt · 1화 · 3·5번째 문장',
+        '↔ B 31·32번째 문장',
+        [['b.txt · 1화 · 31·32번째 문장', '↔ A 3·5번째 문장']],
+      ],
+      [
+        'a.txt · 1화 · 21번째 문장',
+        '↔ B 6·31번째 문장',
+        [
+          ['b.txt · 1화 · 6번째 문장', '↔ A 21번째 문장'],
+          ['b.txt · 1화 · 31번째 문장', '↔ A 21번째 문장'],
+        ],
+      ],
     ])
-    expect(blocks[0]![0]!.a.link).toBe('↔ B 31·32번째 문장')
-    expect(blocks[0]![1]!.a.link).toBe('↔ B 6·31번째 문장')
-    expect(blocks[0]![2]!.b.pieces).toEqual([{ text: lb[30], other: la[20] }])
-    expect(blocks[0]![2]!.b.link).toBe('↑ 위에 나온 칸 · 겹친 문장만')
+    // B 31 was shown beside A 3·5 already; beside A 21 it is whole again, marked against A 21.
+    const again = blocks[1]!.b[1]!.pieces
+    expect(again.filter((x) => x.other !== undefined)).toEqual([{ text: lb[30], other: la[20] }])
+    expect(again.map((x) => x.text).join('')).toContain(lb[27])
+    expect(again.map((x) => x.text).join('')).toContain(lb[34])
   })
 })

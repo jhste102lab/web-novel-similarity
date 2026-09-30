@@ -159,14 +159,14 @@ function MatchDetail({
         <div>{chapterLabel(m.a)}</div>
         <div>{chapterLabel(m.b)}</div>
       </div>
-      {blocks.map((rows, i) => (
-        <div key={i} className="blk">
-          {rows.map((r, j) => (
-            <div key={j} className="cmp">
-              <Stretch side={r.a} k="A" />
-              <Stretch side={r.b} k="B" />
-            </div>
-          ))}
+      {blocks.map((blk, i) => (
+        <div key={i} className="cmp blk">
+          <Stretch side={blk.a} k="A" />
+          <div className="stack">
+            {blk.b.map((s, j) => (
+              <Stretch key={j} side={s} k="B" />
+            ))}
+          </div>
         </div>
       ))}
     </>

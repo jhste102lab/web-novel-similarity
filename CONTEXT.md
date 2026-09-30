@@ -70,7 +70,7 @@ Product (2026-09-21, design accepted):
   `PDF로 저장할까요?`, then builds the whole report (the active tab's findings,
   in the list's current sort order; search ignored) and downloads it.
 - Privacy is shown, not explained: one line under the title
-  (`올려주신 파일은 사용자의 브라우저로만 처리되며 외부 서버로 전송되지 않습니다.`).
+  (`업로드된 파일은 외부 서버로 전송되지 않으며, 사용자의 브라우저 내에서만 처리됩니다.`).
 - Persistence: memory only. Refresh discards results. No JSON save/reopen.
 - File dates: only `File.lastModified` is available in a browser, shown as
   `파일 수정일`. Creation date needs the future desktop build.
@@ -156,18 +156,19 @@ Review (2026-09-30 #4, owner feedback on the PDF):
   save is confirmed with 예/아니오.
 - Context: four sentences a side, keeping the manuscript's line breaks (at
   most one blank line).
-- A slot shows a spinner (and `n / N개` for many files) while files are read.
+- A slot shows a spinner (and `n / N개` for many files) while files are read;
+  the pointer spins (`cursor: progress`) anywhere on the page meanwhile.
 - Export follows the active tab (전체 / 거의 동일 / 일부 수정, 3회 / 5회 이상),
   replacing Review #3's "always every finding"; the first page names it
   (`담은 결과`). Search is not applied.
-- Within a chapter pair the detail pane and the report show each text once
-  (owner's choice among mocked options, 2026-09-30): findings whose context
-  overlaps are joined into one stretch with several marks (`14·16번째 문장`);
-  stretches linked by a finding form a block. Each stretch is its own tinted
-  box naming the other side's sentences it matched (`↔ B 6·30번째 문장`). Each
-  row pairs one A stretch with one B stretch that matched it, so no box stands
-  beside nothing; a stretch already shown whole appears in later rows as only
-  its sentences matching that row (`↑ 위에 나온 칸 · 겹친 문장만`).
+- Within a chapter pair the detail pane and the report show each A text once
+  (owner's choice among mocked options, 2026-09-30, option ⑦): A findings
+  whose context overlaps are joined into one stretch with several marks
+  (`14·16번째 문장`). Beside each A stretch every B stretch it matched is
+  stacked, whole with its context (B findings joined within that stack only).
+  A B text matching two A stretches far apart is shown whole beside each; no
+  box is empty or cut to its matched sentences. Each box names the other
+  side's sentences it matched (`↔ B 6·30번째 문장`).
 - The report and the page may fetch only this site's own files: the build sets
   a Content-Security-Policy with `connect-src 'self'` (see `vite.config.ts`).
 

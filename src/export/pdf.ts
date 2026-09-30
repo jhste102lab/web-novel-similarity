@@ -20,11 +20,11 @@ export interface PdfSide {
   link?: string
   pieces: PdfPiece[]
 }
-/**
- * Stretches of one chapter pair linked by findings, in rows: each row an A box beside the B box
- * it matched. A stretch is shown whole once; later rows repeat only its matching sentences.
- */
-export type PdfBlock = { a: PdfSide; b: PdfSide }[]
+/** One A stretch of a chapter pair beside every B stretch it matched, stacked. */
+export interface PdfBlock {
+  a: PdfSide
+  b: PdfSide[]
+}
 export interface PdfMatch {
   /** "원본.txt · 12화", one per side. */
   a: string
@@ -380,42 +380,68 @@ function cover(l: Layout, input: PdfInput): void {
   l.y += 20
 }
 
-/** Tinted boxes of one row, side by side; split over pages, the heading only on top. */
-function boxes(l: Layout, sides: Record<Key, PdfSide>, again: () => void): void {
-  const lines = {
-    A: l.wrap(pieceRuns(sides.A, 'A'), COL - PAD * 2, BODY),
-    B: l.wrap(pieceRuns(sides.B, 'B'), COL - PAD * 2, BODY),
-  }
-  const top0 = sides.A.link || sides.B.link ? HEAD + LINK : HEAD
-  const rows = Math.max(lines.A.length, lines.B.length)
-  let i = 0
-  while (i < rows) {
-    const head = i === 0 ? top0 : 0
-    if (l.need(PAD * 2 + head + LINE)) again()
-    const n = Math.min(rows - i, Math.floor((BOTTOM - l.y - PAD * 2 - head) / LINE))
-    const h = PAD * 2 + head + n * LINE
-    const top = l.y
-    for (const [key, x] of [
-      ['A', LEFT],
-      ['B', LEFT + COL + GAP],
-    ] as const) {
-      const side = sides[key]
-      l.c?.rect(x, top, COL, h, SIDE[key].bg)
-      if (head) {
-        const w = COL - PAD * 2 - 18
-        l.chip(key, x + PAD, top + PAD)
-        l.c?.text(l.fit(side.label, w, SMALL), x + PAD + 18, top + PAD + 9.5, SMALL, SIDE[key].ink)
-        if (side.link) {
-          l.c?.text(l.fit(side.link, w, SMALL), x + PAD + 18, top + PAD + 9.5 + LINK, SMALL, META)
+/**
+ * A block: the A box on the left, its B boxes stacked on the right. Both columns fill a page
+ * before either goes on to the next one; a box split over pages has its heading only on top.
+ */
+function boxes(l: Layout, block: PdfBlock, again: () => void): void {
+  const cols = (['A', 'B'] as const).map((key) => {
+    const sides = key === 'A' ? [block.a] : block.b
+    return {
+      key,
+      x: key === 'A' ? LEFT : LEFT + COL + GAP,
+      sides,
+      lines: sides.map((s) => l.wrap(pieceRuns(s, key), COL - PAD * 2, BODY)),
+      box: 0,
+      line: 0,
+    }
+  })
+  if (l.need(PAD * 2 + HEAD + LINK + LINE)) again()
+  for (;;) {
+    let bottom = l.y
+    for (const c of cols) {
+      let y = l.y
+      while (c.box < c.sides.length) {
+        const side = c.sides[c.box]!
+        const lines = c.lines[c.box]!
+        const head = c.line === 0 ? (side.link ? HEAD + LINK : HEAD) : 0
+        const n = Math.min(lines.length - c.line, Math.floor((BOTTOM - y - PAD * 2 - head) / LINE))
+        if (n < 1) break
+        const h = PAD * 2 + head + n * LINE
+        l.c?.rect(c.x, y, COL, h, SIDE[c.key].bg)
+        if (head) {
+          const w = COL - PAD * 2 - 18
+          l.chip(c.key, c.x + PAD, y + PAD)
+          l.c?.text(
+            l.fit(side.label, w, SMALL),
+            c.x + PAD + 18,
+            y + PAD + 9.5,
+            SMALL,
+            SIDE[c.key].ink,
+          )
+          if (side.link) {
+            l.c?.text(l.fit(side.link, w, SMALL), c.x + PAD + 18, y + PAD + 9.5 + LINK, SMALL, META)
+          }
+        }
+        for (let k = 0; k < n; k++) {
+          l.drawLine(lines[c.line + k]!, c.x + PAD, y + PAD + head + k * LINE + BASE, BODY)
+        }
+        y += h
+        c.line += n
+        if (c.line === lines.length) {
+          c.box++
+          c.line = 0
+          y += 5
         }
       }
-      for (let k = 0; k < n; k++) {
-        const line = lines[key][i + k]
-        if (line) l.drawLine(line, x + PAD, top + PAD + head + k * LINE + BASE, BODY)
-      }
+      bottom = Math.max(bottom, y)
     }
-    l.y += h
-    i += n
+    if (cols.every((c) => c.box === c.sides.length)) {
+      l.y = bottom
+      return
+    }
+    l.newPage()
+    again()
   }
 }
 
@@ -425,11 +451,8 @@ async function compareBody(l: Layout, rows: PdfMatch[]): Promise<void> {
     l.need(30 + PAD * 2 + HEAD + LINK + LINE * 2)
     l.band(`A ${m.a}`, `B ${m.b}`, m.tier, false)
     for (const block of m.blocks) {
-      for (const row of block) {
-        await l.breathe()
-        boxes(l, { A: row.a, B: row.b }, again)
-        l.y += 5
-      }
+      await l.breathe()
+      boxes(l, block, again)
       l.y += 9
     }
     l.y += 6

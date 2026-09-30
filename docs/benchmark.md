@@ -87,19 +87,20 @@ Caps added because of this run:
   500 × 500 chapters, ~2M chars per side from `bench/run.ts`'s Performance
   section) showed all 168,083 chapter pairs: comparison finished in 6.5 s end
   to end, main-thread JS heap was 1.66 GB after results, and a sort toggle took
-  0.1 s. Its PDF (four context sentences a side; findings with overlapping
-  context joined so each text appears whole once per chapter pair; one row per
-  linked A/B stretch pair, a stretch already shown repeated as only its linked
-  sentences) had 141,131 pages, 487 MB; the 30-page preview took 27 s (mostly
-  counting pages) and saving the whole file 209 s. Earlier layouts of the same
-  run: B beside its first A with empty boxes 134,926 pages / 460 MB / 191 s;
-  joined stretches stacked in one column per side 111,681 / 413 MB / 127 s; one
-  box per passage 134,385 / 477 MB / 152 s; two context sentences 83,831 /
-  337 MB / 130 s; one sentence 51,311 / 222 MB / 86 s. Before yielding every
-  ten pages to drain PDFKit's output queue, the one-sentence export took 249 s.
-  On two real manuscripts kept outside the repository these layouts (one box
-  per passage → one column per side → empty boxes → linked rows) gave 7,949 →
-  4,372 → 5,746 → 6,454 pages and 1,510 → 943 → 1,142 → 1,164 pages.
+  0.1 s. Its PDF (four context sentences a side; each A stretch of joined
+  findings once, every B stretch it matched stacked beside it whole) had
+  137,461 pages, 482 MB; the 30-page preview took 27 s (mostly counting pages)
+  and saving the whole file 191 s. Earlier layouts of the same run: one row per
+  linked A/B pair with repeats cut to their linked sentences 141,131 pages /
+  487 MB / 209 s; B beside its first A with empty boxes 134,926 / 460 MB /
+  191 s; joined stretches stacked in one column per side 111,681 / 413 MB /
+  127 s; one box per passage 134,385 / 477 MB / 152 s; two context sentences
+  83,831 / 337 MB / 130 s; one sentence 51,311 / 222 MB / 86 s. Before yielding
+  every ten pages to drain PDFKit's output queue, the one-sentence export took
+  249 s. On two real manuscripts kept outside the repository these layouts (one
+  box per passage → one column per side → empty boxes → linked rows → B
+  stacked beside A) gave 7,949 → 4,372 → 5,746 → 6,454 → 7,067 pages and
+  1,510 → 943 → 1,142 → 1,164 → 1,022 pages.
 - `MAX_PASSAGES_PER_MATCH = 20` passages per chapter pair, strongest first, with
   `유사 문장 26개 · 상위 20개 표시` in the detail header.
 - The 내부 반복 detail pane lists at most 100 occurrences of a group (`외 882곳`
