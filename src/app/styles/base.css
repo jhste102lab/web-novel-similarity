@@ -146,6 +146,9 @@ button {
   justify-content: flex-end;
   gap: 8px;
 }
+.modal .bar {
+  margin: -8px 0 22px;
+}
 .dot {
   width: 8px;
   height: 8px;

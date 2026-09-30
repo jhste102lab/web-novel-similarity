@@ -9,18 +9,18 @@ Owning documents: this file (terms and settled product decisions),
 
 ## Glossary
 
-| Term (KO)                     | Meaning                                                            | Boundary / scenario                                                                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 원고 (Manuscript)             | One logical work loaded into a slot (A or B).                      | Built from one file or many files; always one text with chapter offsets. 500 `.txt` files dropped into slot A become one 원고 with 500 회차.              |
-| 회차 (Chapter)                | A numbered episode inside a 원고.                                  | Detected, never configured. See "Chapter detection". A 원고 may have no 회차; positions are then reported by sentence index.                              |
-| 검사 모드 (Mode)              | `A/B 비교` (two slots) or `내부 반복` (slot A only).               | Chosen with the `원고 두 개 비교` switch on the start screen; the page opens with it off (내부 반복).                                                     |
-| 검사 범위 (Range)             | Inclusive chapter interval per 원고 that the check covers.         | Dual-handle slider under each filled card; default = all. Rows outside the range are dimmed in the file list. Absent when the 원고 has no 회차.           |
-| 유사 구간 (Passage)           | A run of consecutive matched sentences on both sides.              | Evidence unit inside a 회차 쌍; one matched sentence is a passage of length 1. Never a top-level row.                                                     |
-| 회차 쌍 (Chapter match)       | One 회차 of A and one 회차 of B with every 유사 구간 between them. | Primary result unit in `A/B 비교`. A 원고 without 회차 yields a single pair labelled `본문`.                                                              |
-| 내부 반복 그룹 (Repeat group) | One expression and every 회차 where it recurs.                     | Primary result unit in `내부 반복`. Filtered by occurrence count (`3회 이상`, `5회 이상`).                                                                |
-| 등급 (Tier)                   | `거의 동일` or `일부 수정`. Nothing weaker is reported.            | Thresholds fixed by the benchmark (ADR 0004). No percentage is shown: the internal ratio is not calibrated against any external standard.                 |
-| 흔한 표현 (Common phrase)     | Short stock sentence that recurs widely ("잠시 침묵이 흘렀다").    | Not a suspicion: dropped by the engine, never listed or tagged.                                                                                           |
-| 보고서 (Report)               | PDF/PNG export of the summary and the passage list.                | 원고 appear under a user-editable title (default: filename). Fixed footer: `문자 유사도 기반 참고 자료`. States its 범위 (`전체 26개`, `1,560개 중 4개`). |
+| Term (KO)                     | Meaning                                                                             | Boundary / scenario                                                                                                                                                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 원고 (Manuscript)             | One logical work loaded into a slot (A or B).                                       | Built from one file or many files; always one text with chapter offsets. 500 `.txt` files dropped into slot A become one 원고 with 500 회차.                                                                                        |
+| 회차 (Chapter)                | A numbered episode inside a 원고.                                                   | Detected, never configured. See "Chapter detection". A 원고 may have no 회차; positions are then reported by sentence index.                                                                                                        |
+| 검사 모드 (Mode)              | `A/B 비교` (two slots) or `내부 반복` (slot A only).                                | Chosen with the `원고 두 개 비교` switch on the start screen; the page opens with it off (내부 반복).                                                                                                                               |
+| 검사 범위 (Range)             | Inclusive chapter interval per 원고 that the check covers.                          | Dual-handle slider under each filled card; default = all. Rows outside the range are dimmed in the file list. Absent when the 원고 has no 회차.                                                                                     |
+| 유사 구간 (Passage)           | A run of consecutive matched sentences on both sides.                               | Evidence unit inside a 회차 쌍; one matched sentence is a passage of length 1. Never a top-level row.                                                                                                                               |
+| 회차 쌍 (Chapter match)       | One 회차 of A and one 회차 of B with every 유사 구간 between them.                  | Primary result unit in `A/B 비교`. A 원고 without 회차 yields a single pair labelled `본문`.                                                                                                                                        |
+| 내부 반복 그룹 (Repeat group) | One expression and every 회차 where it recurs.                                      | Primary result unit in `내부 반복`. Filtered by occurrence count (`3회 이상`, `5회 이상`).                                                                                                                                          |
+| 등급 (Tier)                   | `거의 동일` or `일부 수정`. Nothing weaker is reported.                             | Thresholds fixed by the benchmark (ADR 0004). No percentage is shown: the internal ratio is not calibrated against any external standard.                                                                                           |
+| 흔한 표현 (Common phrase)     | Short stock sentence that recurs widely ("잠시 침묵이 흘렀다").                     | Not a suspicion: dropped by the engine, never listed or tagged.                                                                                                                                                                     |
+| 보고서 (Report)               | PDF of every finding in the list's current sort order, regardless of tab or search. | First page lists manuscript titles, chapter extent, full file names and result counts. Each page has A/B file names in the header and an `n / N` footer. Shared text is highlighted; surrounding sentences are dimmed and unmarked. |
 
 ## Chapter detection
 
@@ -65,7 +65,8 @@ Product (2026-09-21, design accepted):
   tabs: 전체 / 거의 동일 / 일부 수정 (A/B) and 전체 / 3회 이상 / 5회 이상 (내부 반복).
 - Only suspicions are shown. Below 일부 수정 and every 흔한 표현 is removed by
   the engine, and no similarity percentage is displayed anywhere.
-- Export: PDF and PNG of summary + passage list, opened as an overlay first.
+- Export: 내보내기 immediately builds and downloads a PDF of every finding,
+  in the list's current sort order, regardless of tab or search.
 - Privacy is shown, not explained: one line under the title
   (`파일은 서버에 저장하지 않고 사용자의 브라우저에서만 처리됩니다`).
 - Persistence: memory only. Refresh discards results. No JSON save/reopen.
@@ -85,8 +86,8 @@ Engineering (2026-09-21, ADR 0002–0004):
 - React + Vite + TypeScript; npm; MIT; GitHub Pages via Actions. The accepted
   design's stylesheet is used verbatim (no Tailwind — ADR 0003 amendment).
 - Tier thresholds tuned on a fully synthetic, committed benchmark corpus.
-- Export: PNG via `html2canvas-pro`, PDF via the browser print dialog
-  (ADR 0003 amendment).
+- Export: DOM-free two-pass PDF layout with PDFKit 0.20 in a Web Worker,
+  subset-embedded Pretendard TTF and cancellable page progress (ADR 0007).
 
 Review (2026-09-22, after hands-on use):
 
@@ -96,8 +97,6 @@ Review (2026-09-22, after hands-on use):
   the detail adds the passage count (`구간 N개`).
 - Review aids: search box, per-passage `문장 복사`, keyboard (`j`/`k`, `/`,
   `c`, `d`, `?`), a diagnostics panel with phase timings.
-- Export option: passages per 회차 쌍 (전체 / 5 / 1) — replaced by 범위 and
-  분량, Review 2026-09-30 #2.
 - Works offline after the first visit (service worker); no chapter-map view.
 
 Review (2026-09-30):
@@ -110,24 +109,35 @@ Review (2026-09-30):
   own leave-page prompt (reload, close, back).
 - A failed drop names the file (`‘12화.hwpx’ 파일을 읽지 못했어요.`).
 
-Review (2026-09-30 #2, export scope; decided on an HTML mockup):
+Review (2026-09-30 #2, shared-text marks; updated after real-result feedback):
 
-- Result rows can be ticked for export: checkbox, `전체 선택` (the rows the
-  tab and search show), `선택 해제`, Shift+click for a range, `x` on the
-  current row. Ticks survive tab and search changes.
-- Export overlay 범위: `지금 목록 N개` (tab + search) / `상위 10·50·100개` /
-  `선택한 N개`; opening it with ticked rows selects `선택한 N개`.
-- Export overlay 분량: `요약표만` / `대조 일부`·`위치 일부` (first 3 sentences
-  of a passage, first 3 places of a repeat) / `대조 전부`·`위치 전부` (default).
-- Marks show what the two sides **share**, in the detail pane and the report
-  (earlier: what differed). Repeat places in the report show the sentence
-  before and after, the repeated one marked.
-- The overlay shows `A4 약 N쪽`; the save menu reads `PNG · N장 (압축 파일)`
-  when the report is cut into several images and `PDF · N쪽`.
+- Result order defaults to 회차순; the list's sort bar also offers 유사도순
+  for comparison and 반복 많은 순 for repeats. The PDF follows this order.
+- Marks show what the two sides **share**, in the detail pane and the PDF
+  (earlier: what differed). Comparison passages and repeat places show the
+  neighbouring sentences on screen and in the PDF, dimmed and never marked.
+- Export is a PDF of every finding, independent of tab and search. No export
+  scope or amount options, image export, preview or row selection remains.
+- Every chapter pair and repeat group is kept; there is no result cap.
+  The strongest 20 passages per chapter pair are still retained.
 - A repeat's detail lists 100 places and then `외 N곳 더 보기`.
 - The report has no coloured side bar; tier dots and marks print in colour.
 - The HWP 5 reader is fetched right after the page loads and precached for
   offline use, so the first HWP file rarely waits for it (ADR 0006).
+
+Review (2026-09-30 #3, owner feedback on real results):
+
+- Chapter order should be the default, so results can be read front to back.
+- Show the surrounding sentences to make a finding's context visible.
+- Long downloads must complete reliably, not clip or stop partway through.
+- Export scope is always every finding, regardless of tab or search.
+- Use a PDF library only, with reports beyond 3,000 pages supported (ADR 0007).
+- Remove the export-scope control.
+- Remove the export-amount control.
+- Exports over 100 MB must work.
+- Show every finding; remove the 3,000-result limit and its hidden-results note.
+- Include A/B file names and a current/total page footer such as `3 / 100`.
+- Reference: a KCI/CopyKiller report PDF, used for layout ideas only.
 
 ## Open decisions
 

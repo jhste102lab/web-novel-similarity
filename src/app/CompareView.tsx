@@ -1,47 +1,52 @@
 import { useMemo } from 'react'
+import type { Around } from '../engine/context.ts'
 import { charDiff } from '../engine/diff.ts'
 import type { ChapterMatch, CompareResult, Passage, Tier } from '../shared/types.ts'
 import { CopyButton, pairText } from './CopyButton.tsx'
 import { Marked } from './Marked.tsx'
 import { ResultsShell, Tab, type ViewProps } from './ResultsShell.tsx'
 import {
-  cappedNote,
   chapterLabel,
   filterMatches,
   firstLine,
-  matchKey,
   ordinal,
   searchMatches,
+  sortMatches,
   TIER_CLASS,
   TIER_LABEL,
   type CompareFilter,
 } from './results.ts'
 
+export type AroundFn = (start: number, end: number) => Around
+
 interface Props extends ViewProps<CompareResult, CompareFilter> {
   titleB: string
   rangeNote: string | null
+  aroundA: AroundFn
+  aroundB: AroundFn
 }
-
 /** A ↔ B results: one row per chapter pair, the detail pane shows its passages side by side. */
 export function CompareView({
   result,
   titleA,
   titleB,
   rangeNote,
+  aroundA,
+  aroundB,
   filter,
   onFilter,
   query,
   onQuery,
   selected,
   onSelect,
-  picked,
-  onPick,
+  order,
+  onOrder,
   running,
   stopped,
 }: Props) {
   const rows = useMemo(
-    () => searchMatches(filterMatches(result.matches, filter), query),
-    [result, filter, query],
+    () => searchMatches(filterMatches(sortMatches(result.matches, order), filter), query),
+    [result, filter, query, order],
   )
   const tierTab = (t: Tier) => (
     <Tab
@@ -83,13 +88,12 @@ export function CompareView({
       rows={rows}
       selected={selected}
       onSelect={onSelect}
-      picked={picked}
-      onPick={onPick}
-      keyOf={matchKey}
+      order={order}
+      onOrder={onOrder}
+      scoreLabel="유사도순"
       query={query}
       onQuery={onQuery}
       emptyText={query ? '찾는 조건에 맞는 결과가 없습니다.' : '의심되는 유사 문장이 없습니다.'}
-      capped={cappedNote(result.matches.length, result.total)}
       running={running}
       stopped={stopped}
       stats={result.stats}
@@ -108,12 +112,20 @@ export function CompareView({
           </div>
         </>
       )}
-      renderDetail={(m) => <MatchDetail m={m} />}
+      renderDetail={(m) => <MatchDetail m={m} aroundA={aroundA} aroundB={aroundB} />}
     />
   )
 }
 
-function MatchDetail({ m }: { m: ChapterMatch }) {
+function MatchDetail({
+  m,
+  aroundA,
+  aroundB,
+}: {
+  m: ChapterMatch
+  aroundA: AroundFn
+  aroundB: AroundFn
+}) {
   return (
     <>
       <div className="head">
@@ -127,14 +139,24 @@ function MatchDetail({ m }: { m: ChapterMatch }) {
         </span>
       </div>
       {m.passages.map((p, i) => (
-        <PassagePair key={i} p={p} />
+        <PassagePair key={i} p={p} aroundA={aroundA} aroundB={aroundB} />
       ))}
     </>
   )
 }
 
-function PassagePair({ p }: { p: Passage }) {
+function PassagePair({
+  p,
+  aroundA,
+  aroundB,
+}: {
+  p: Passage
+  aroundA: AroundFn
+  aroundB: AroundFn
+}) {
   const diff = useMemo(() => charDiff(p.a.text, p.b.text), [p])
+  const a = aroundA(p.a.start, p.a.end)
+  const b = aroundB(p.b.start, p.b.end)
   return (
     <div className="cmp">
       <div className="pane">
@@ -142,14 +164,29 @@ function PassagePair({ p }: { p: Passage }) {
           <b>A</b> {ordinal(p.a)}
           <CopyButton a={p.a.text} b={p.b.text} />
         </div>
-        <Marked diff={diff} side="a" />
+        <Context around={a}>
+          <Marked diff={diff} side="a" />
+        </Context>
       </div>
       <div className="pane">
         <div className="k">
           <b>B</b> {ordinal(p.b)}
         </div>
-        <Marked diff={diff} side="b" />
+        <Context around={b}>
+          <Marked diff={diff} side="b" />
+        </Context>
       </div>
     </div>
+  )
+}
+
+/** A finding between the sentences around it, which are dimmed and never marked. */
+export function Context({ around, children }: { around: Around; children: React.ReactNode }) {
+  return (
+    <>
+      {around.before && <span className="ctx">{around.before} </span>}
+      {children}
+      {around.after && <span className="ctx"> {around.after}</span>}
+    </>
   )
 }

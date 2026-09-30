@@ -12,6 +12,8 @@ import type { ChapterRange, ManuscriptText } from '../shared/types.ts'
 export interface Slot {
   manuscript: Manuscript
   title: string
+  /** Names of the dropped files, in reading order; the report lists them. */
+  files: string[]
   labels: (number | null)[]
   /** null = whole manuscript, or when it has no chapters. */
   range: ChapterRange | null
@@ -58,6 +60,7 @@ export async function loadSlot(files: File[]): Promise<Slot> {
   return {
     manuscript,
     title: manuscript.title,
+    files: files.map((f) => f.name).sort(new Intl.Collator('ko', { numeric: true }).compare),
     labels: manuscript.parts.map((p) => p.label),
     range: null,
   }

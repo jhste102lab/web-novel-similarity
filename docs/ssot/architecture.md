@@ -37,17 +37,18 @@ Where to look first for a given change. Tests sit next to their module.
 | `src/engine/compare.ts`                                           | A/B scan, passage chaining, chapter grouping, streaming snapshots                                       |
 | `src/engine/repeats.ts`                                           | 내부 반복: union-find over near-duplicates in one manuscript                                            |
 | `src/engine/diff.ts`                                              | Character diff behind the marks in the detail pane and the report                                       |
+| `src/engine/context.ts`                                           | Offset-based neighbouring sentence pieces shared by detail panes and PDF                                |
 | `src/worker/`                                                     | `protocol.ts` messages, `worker.ts` entry, `client.ts` `runInWorker` (abort = terminate)                |
 | `src/app/App.tsx`                                                 | Screen state machine (start → analyzing → results), header, export wiring                               |
 | `src/app/StartScreen.tsx`, `SlotCard.tsx`, `RangeSlider.tsx`      | File slots, chapter table edits, 검사 범위                                                              |
 | `src/app/slot.ts`, `dropFiles.ts`                                 | Slot model and labels; folder drops                                                                     |
 | `src/app/AnalyzingScreen.tsx`                                     | Progress until the first findings arrive                                                                |
-| `src/app/ResultsShell.tsx`                                        | Shared result layout: windowed list, row ticks for export, keyboard, search, panels                     |
+| `src/app/ResultsShell.tsx`                                        | Shared result layout: windowed list, sort bar, keyboard, search, panels                                 |
 | `src/app/CompareView.tsx`, `RepeatView.tsx`                       | Row and detail rendering for each mode                                                                  |
-| `src/app/results.ts`                                              | Tier labels, filters, search, row keys, position labels shared by views and report                      |
+| `src/app/results.ts`                                              | Tier labels, filters, search, sorting and position labels shared by views and PDF                       |
 | `src/app/CopyButton.tsx`, `Marked.tsx`, `Modal.tsx`, `Panels.tsx` | Copy, shared-text marks, confirm dialog, diagnostics/shortcut HUDs                                      |
-| `src/app/ExportOverlay.tsx`, `src/export/`                        | Export dialog; printable report; repeat context lookup; PNG pieces and PDF saving                       |
-| `src/app/styles/`                                                 | One stylesheet per screen; `export.css` holds the print rules                                           |
+| `src/export/pdf.ts`, `pdf.worker.ts`, `exportPdf.ts`              | DOM-free PDF layout; PDFKit worker; progress, cancellation and download client                          |
+| `src/app/styles/`                                                 | One stylesheet per screen                                                                               |
 | `public/sw.js`, `scripts/sw-precache.ts`                          | Offline cache; the build injects hashed file names                                                      |
 | `scripts/compare.ts`                                              | CLI: compare two files, or find repeats in one                                                          |
 | `bench/`                                                          | Synthetic corpus generator and threshold benchmark (`npm run bench`)                                    |
@@ -63,14 +64,14 @@ Where to look first for a given change. Tests sit next to their module.
 7. **Noise removal** — a one-sentence passage whose text is a 흔한 표현 (`engine/common.ts`: ≤ `COMMON_MAX_CHARS` chars, appearing in ≥ `COMMON_MIN_CHAPTERS` chapters) is dropped, not tagged. The same rule drops 흔한 표현 groups in 내부 반복.
 8. **Chapter grouping** — passages are grouped by (chapter of A, chapter of B). One `ChapterMatch` = one row in the UI: tier (`near` when any of its passages is 거의 동일, from the _rounded_ percentage), `count` of matched sentences, `runs` of passages, and the strongest `MAX_PASSAGES_PER_MATCH` of them in reading order. Scores exist only inside the engine; they are never shown, because the ratio is not calibrated against any external notion of copying.
 9. **Repeats** — `engine/repeats.ts`: union-find over near-duplicate sentence pairs inside one manuscript; occurrences closer than `REPEAT_MIN_GAP` sentences count once.
-10. **Result cap** — chapter pairs are sorted by 거의 동일 count, then matched-sentence count, and cut to `MAX_RESULTS`; `total` carries the uncapped count and the UI says how many were hidden.
+10. **Result order** — chapter pairs are sorted by 거의 동일 sentence count, then matched-sentence count; repeat groups by occurrence count. Every finding is kept. The UI defaults to chapter order and can switch back to this engine order.
 11. **Streaming** — every `PARTIAL_EVERY_MS` the scan regroups the pairs found so far and posts them as a `partial` response. The UI leaves the progress screen at the first partial, so review starts about a second into a 2M-char run instead of after it. Stopping keeps what was scanned.
-12. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened or a report row is rendered; 1-char equal islands are folded into the surrounding change. Above 250,000 LCS cells (a whole copied chapter) the texts are first matched sentence by sentence and only the unmatched stretches between equal sentences are diffed by character. The UI marks the **shared** text (`Marked.tsx`).
+12. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened or the PDF is laid out; 1-char equal islands are folded into the surrounding change. Above 250,000 LCS cells (a whole copied chapter) the texts are first matched sentence by sentence and only the unmatched stretches between equal sentences are diffed by character. The UI and PDF mark the **shared** text.
 
 Scale target: 500 chapters × 4,000 chars per side (≈ 2M chars), ≤ 5 s.
-Measured: ~1.5–1.7 s in Node and ~3.6 s end to end in Chrome including parsing
-and rendering, with the first findings on screen after ~0.8 s
-(`docs/benchmark.md`).
+Measured without a result cap: 6.5 s end to end in Chrome on an M5 Mac for
+168,083 chapter pairs, with 1.66 GB main-thread JS heap after results; changing
+sort order took 0.1 s (`docs/benchmark.md`, 2026-09-30).
 
 ## Worker protocol
 
@@ -105,6 +106,8 @@ interface Span {
   chapter: number | null
   sentenceIndex: number
   text: string
+  start: number // [start, end) offsets in the engine text
+  end: number
 }
 interface Passage {
   tier: 'near' | 'edited'
@@ -122,18 +125,21 @@ interface ChapterMatch {
 interface CompareResult {
   kind: 'compare'
   matches: ChapterMatch[]
-  total: number // chapter pairs before the MAX_RESULTS cap
   stats: RunStats // phase timings, sentence counts, pairs scored vs. pairs possible
+}
+interface Occurrence {
+  chapter: number | null
+  sentenceIndex: number
+  start: number // [start, end) offsets in the engine text
+  end: number
 }
 interface RepeatGroup {
   text: string
-  // id: sentence id in indexSentences() of the searched text, for the report's context lookup
-  occurrences: { chapter: number | null; sentenceIndex: number; id: number }[]
+  occurrences: Occurrence[]
 }
 interface RepeatResult {
   kind: 'repeat'
   groups: RepeatGroup[]
-  total: number
   stats: RunStats
 }
 ```
@@ -160,7 +166,6 @@ All in `src/shared/constants.ts`; rationale in
 | `TIER_EDITED`                              | score ≥ → 일부 수정; below → dropped     | 0.62                  |
 | `COMMON_MAX_CHARS` / `COMMON_MIN_CHAPTERS` | 흔한 표현, dropped                       | 14 chars / 4 chapters |
 | `REPEAT_MIN_GAP`                           | 내부 반복 occurrences must be this apart | 3 sentences           |
-| `MAX_RESULTS`                              | findings kept for display                | 3,000                 |
 | `MAX_PASSAGES_PER_MATCH`                   | passages kept per chapter pair           | 20                    |
 | `PROGRESS_EVERY`                           | progress tick, in query sentences        | 500                   |
 | `PARTIAL_EVERY_MS`                         | streaming snapshot cadence               | 400 ms                |
@@ -169,16 +174,18 @@ All in `src/shared/constants.ts`; rationale in
 
 The two result views (`CompareView`, `RepeatView`) share `ResultsShell` in `src/app/ResultsShell.tsx`:
 
-- **Windowed list** — rows are a fixed 75 px (`.item` in `styles/results.css`, `ROW_H` in `ResultsShell.tsx`), so 3,000 findings render as ~20 nodes.
-- **Keyboard** — `j`/`k`/arrows, `g`/`G`, `/` to search, `x` to tick a row for export, `c` to copy, `d` for diagnostics, `?` for the sheet. Shift+click ticks every row between the last clicked one and this one; 전체 선택 ticks the rows the tab and search leave visible. Ticks are keyed by chapter pair / group text (`matchKey`, `groupKey`) and live in `App`, like the search query, so the export can use them.
+- **Windowed list** — rows are a fixed 75 px (`.item` in `styles/results.css`, `ROW_H` in `ResultsShell.tsx`); only the viewport plus six rows on each side is rendered, even with 168,083 findings. No findings are hidden by a result cap.
+- **Sorting** — `.sortbar` above the list offers 회차순 (default: A chapter then B chapter for comparison; first occurrence offset for repeats) and 유사도순 / 반복 많은 순 (engine order). `Order = 'chapter' | 'score'`, `sortMatches` and `sortGroups` live in `results.ts`; `App.tsx` owns the order, also used by the PDF.
+- **Keyboard** — `j`/`k`/arrows, `g`/`G`, `/` to search, `c` to copy, `d` for diagnostics, `?` for the sheet. There are no export checkboxes or row-selection shortcuts.
+- **Context** — comparison passages and repeat places show the sentence before and after in dimmed `.ctx` text, never marked. `aroundOf(ManuscriptText)` returns `(start, end) => { before, text, after }` from `engine/context.ts`; chapter segment boundaries are found by offset, not label. Short sentence pieces are included; neighbours longer than the 400-character lookup reach show only their nearer part.
 - **Repeat detail** — the first 100 places of a group are listed; `외 N곳 더 보기` lists the rest.
 - **Diagnostics** (`src/app/Panels.tsx`) — phase timings plus `pairsScored / pairsNaive`, which is what the fingerprint index buys: 0.014 % on a 2M × 2M-char run.
 
 ## Offline
 
-`public/sw.js` caches the shell and this build's JS, CSS and rhwp's WASM
-(~3.7 MB gzipped, ADR 0006) at install, then every same-origin GET as it is
-requested.
+`public/sw.js` caches the shell and this build's JS, CSS, rhwp's WASM
+and the report's TTF font at install, then every same-origin GET as it is
+requested. `scripts/sw-precache.ts` includes `.ttf`, so PDF export works offline.
 Assets are cache-first (their names carry a
 content hash, so a hit is never the wrong file); **navigations are network-first**
 with a cache fallback, because the HTML shell names the hashed assets of its build
@@ -189,18 +196,26 @@ the "nothing is uploaded" claim.
 
 ## Export
 
-The overlay picks what goes in (**범위**) and how much of each row (**분량**); rows come from `App.tsx`:
+내보내기 immediately builds a PDF of **every finding**, regardless of tab or
+search, in the list's current sort order. There is no preview or export setting.
+The per-chapter-pair passage limit still applies; repeats include every place.
 
-- 범위: 지금 목록 (tab + search, as on screen), 상위 10/50/100 of that list, or 선택한 N개 (ticked rows, whatever the tab). Opening the overlay with ticked rows selects 선택한 N개.
-- 분량: 요약표만 (one table row per finding), 일부 (compare: the first 3 sentences of each passage, repeat: the first 3 places, then `… 외 N`), 전부 (default). Repeat places show the sentence before and after within the same chapter segment, short ones included (`src/export/context.ts` re-indexes the searched text, finds the occurrence by `id`, and reads the neighbours from the raw text). The report's 범위 line counts against the uncapped `total`.
-- The header shows `A4 약 N쪽`: the report cloned at the A4 text width (688 px) divided by 920 px, a figure calibrated against Chrome's PDF of `docs/samples`.
-- **PDF**: `window.print()` with `@media print` rules in `src/app/styles/export.css`. The report keeps selectable text and the browser paginates it. The print rules undo the overlay's scroll box and height cap (with them the printout stopped after one screenful), print two-column blocks as tables so every browser can split them across pages, and keep colours (`print-color-adjust: exact`).
-- **PNG**: `html2canvas-pro` at 2×. A report taller than one canvas (`MAX_CANVAS_SIDE`, 16,000 px) is cut into pieces of whole rows (a longer row is split between its children, a summary table between its rows with the header repeated), each rendered from a clone outside the overlay and zipped with fflate (stored, not deflated). Marks are split per word in the clones and words kept whole: html2canvas paints a mark that wraps as one box over both lines.
+- **Client** — `src/export/exportPdf.ts` starts a fresh worker and downloads the result. `App.tsx` shows `PDF 만드는 중`, first `쪽을 나누고 있어요…`, then an `n / N쪽` progress bar with 취소. Cancellation terminates the worker; failure shows `PDF를 만들지 못했어요` with 닫기. The download name is `유사도 검사 2026. 9. 30.pdf` for that date.
+- **Worker** — `src/export/pdf.worker.ts` uses PDFKit 0.20's browser build and `Pretendard-Regular.ttf` from `pretendard/dist/public/static/alternative/`, subset-embedded. Text stays selectable. PDFKit emits completed pages; the layout yields every ten pages to let its output queue drain.
+- **Layout** — `src/export/pdf.ts` is DOM-free and runs twice: count pages without drawing, then draw with a known total. Every page has a file-name running header (`A 원본.txt ↔ B 편집본.txt`; many files use `first 외 N개`), an `n / N` footer on the left and the date on the right.
+- **First page** — `유사도 검사 결과` / `내부 반복 검사 결과`, 검사일, 원고 A/B title and chapter extent, full file-name lists (`A 파일 N개`, naturally sorted by numeric filename in `Slot.files`), result counts, 정렬, and 참고 when stopped. The legend explains 겹치는 부분 and 앞뒤 문장.
+- **Comparison** — a grey band with a tier dot, `A 12화 ↔ B 15화`, and `거의 동일 · 유사 문장 N개 · 구간 M개`; passages below use two columns labelled `A · 12화 · 3번째 문장` / `B · …`. Shared text is highlighted; neighbouring sentences are grey and unmarked.
+- **Repeats** — a band such as `6회 · 27화~39화`, followed by every place with a label column and the repeated text plus context. Rows in either mode split across pages with a `(계속)` band.
+
+Measured in Chrome on an M5 Mac (production build via Vite preview): the
+26 chapter pairs in `docs/samples` produced 55 pages, 0.31 MB, in ~0.3 s.
+The synthetic worst case produced 51,311 pages, 222 MB, in 86 s
+(~11 s counting, ~75 s drawing; `docs/benchmark.md`).
 
 ## Build and deploy
 
 Vite static build → `dist/`; GitHub Actions workflow on `main` publishes to
 GitHub Pages. `base` is `/web-novel-similarity/`, the repository name. No environment
-variables. `html2canvas-pro`, `mammoth` and `@rhwp/core` are dynamically
-imported so they stay out of the initial bundle; rhwp is then fetched after the
-page's `load` event (ADR 0006).
+variables. `mammoth` and `@rhwp/core` are dynamically imported so they stay out
+of the initial bundle; rhwp is then fetched after the page's `load` event
+(ADR 0006). PDFKit is confined to the export worker chunk (ADR 0007).

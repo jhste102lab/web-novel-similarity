@@ -78,19 +78,34 @@ on the production build:
 
 Caps added because of this run:
 
-- `MAX_RESULTS = 3000` chapter pairs. Before grouping and capping, the result held
-  ~600k sentence-level passages with their text on both sides; the renderer reached
-  11.8 GB RSS and stopped responding. The UI shows
-  `전체 N개 중 상위 3,000개만 표시해요` when the cap bites.
+- The former `MAX_RESULTS = 3000` chapter-pair cap was removed on 2026-09-30
+  because the owner wants every finding. Historically, before grouping and
+  capping, ~600k sentence-level passages held text on both sides; the renderer
+  reached 11.8 GB RSS and stopped responding. The former
+  `전체 N개 중 상위 3,000개만 표시해요` note is gone.
+  The new Chrome run on an M5 Mac (production build via Vite preview, synthetic
+  500 × 500 chapters, ~2M chars per side from `bench/run.ts`'s Performance
+  section) showed all 168,083 chapter pairs: comparison finished in 6.5 s end
+  to end, main-thread JS heap was 1.66 GB after results, and a sort toggle took
+  0.1 s. Its PDF had 51,311 pages, 222 MB, built in 86 s (~11 s counting pages,
+  ~75 s drawing). Before yielding every ten pages to drain PDFKit's output
+  queue, the same export took 249 s.
 - `MAX_PASSAGES_PER_MATCH = 20` passages per chapter pair, strongest first, with
   `유사 문장 26개 · 상위 20개 표시` in the detail header.
 - The 내부 반복 detail pane lists at most 100 occurrences of a group (`외 882곳`
   for the rest); one synthetic group occurred 982 times.
 
-Also verified in the same session: 중단 mid-run returns to the start screen with
-both slots still loaded, `새로 비교` asks before discarding results, a `.hwp` drop
-shows `hwp는 열 수 없어요. 한글에서 hwpx로 저장해 주세요.`, PDF export produces
-paginated selectable text, and PNG export produces a 860 × 16,000 px image.
+Historically, also verified in that session: 중단 mid-run returned to the start
+screen with both slots still loaded, `새로 비교` asked before discarding results,
+a `.hwp` drop showed `hwp는 열 수 없어요. 한글에서 hwpx로 저장해 주세요.`,
+the old print-based PDF export produced paginated selectable text, and the
+former PNG export produced a 860 × 16,000 px image. These describe the old
+behaviour, not the current HWP reader, streaming stop or PDF export.
+
+The 2026-09-30 PDF export measurements (Chrome, M5 Mac, production build via
+Vite preview) also covered `docs/samples`: 26 chapter pairs, 55 pages, 0.31 MB,
+~0.3 s. In Node, 3,000 dense pages took PDFKit 7.5 s / 23.8 MB / 268 MB peak
+RSS, versus jsPDF 10.3 s / 24.3 MB / 1.9 GB peak RSS (ADR 0007).
 
 ## Input-format and range checks (browser, production build)
 

@@ -146,7 +146,7 @@ const t0 = performance.now()
 const big = compare(A, B)
 const ms = Math.round(performance.now() - t0)
 log(
-  `A ${A.text.length.toLocaleString()} chars, B ${B.text.length.toLocaleString()} chars, ${big.total.toLocaleString()} chapter pairs, ${ms} ms (Node ${process.version}).`,
+  `A ${A.text.length.toLocaleString()} chars, B ${B.text.length.toLocaleString()} chars, ${big.matches.length.toLocaleString()} chapter pairs, ${ms} ms (Node ${process.version}).`,
 )
 
 const reportAt = process.argv.indexOf('--report')

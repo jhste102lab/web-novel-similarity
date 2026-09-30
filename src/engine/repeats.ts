@@ -1,5 +1,4 @@
 import {
-  MAX_RESULTS,
   PARTIAL_EVERY_MS,
   PROGRESS_EVERY,
   REPEAT_MIN_GAP,
@@ -127,15 +126,11 @@ function buildResult(
     const occurrences = kept.map((id) => ({
       chapter: idx.chapter[id]! < 0 ? null : idx.chapter[id]!,
       sentenceIndex: idx.ordinal[id]!,
-      id,
+      start: idx.starts[id]!,
+      end: idx.ends[id]!,
     }))
     groups.push({ text: sentenceText(idx, first), occurrences })
   }
   groups.sort((x, y) => y.occurrences.length - x.occurrences.length)
-  return {
-    kind: 'repeat',
-    total: groups.length,
-    groups: groups.slice(0, MAX_RESULTS),
-    stats: { ...stats },
-  }
+  return { kind: 'repeat', groups, stats: { ...stats } }
 }

@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
-import { contextOf } from '../export/context.ts'
-import { CompareReport, RepeatReport, type Amount } from '../export/Report.tsx'
+import { aroundOf } from '../engine/context.ts'
+import { download, exportPdf } from '../export/exportPdf.ts'
+import type { PdfInput } from '../export/pdf.ts'
 import type { CompareResult, RepeatResult } from '../shared/types.ts'
 import { runInWorker, type Run } from '../worker/client.ts'
 import { AnalyzingScreen } from './AnalyzingScreen.tsx'
-import { ExportOverlay } from './ExportOverlay.tsx'
 import { Modal, type ModalProps } from './Modal.tsx'
 import { RepeatView } from './RepeatView.tsx'
-import { CompareView } from './CompareView.tsx'
+import { CompareView, type AroundFn } from './CompareView.tsx'
 import {
+  chapterLabel,
   filterGroups,
   filterMatches,
-  groupKey,
-  matchKey,
-  searchGroups,
-  searchMatches,
+  groupSpan,
+  ordinal,
+  sortGroups,
+  sortMatches,
+  TIER_LABEL,
+  where,
   type CompareFilter,
+  type Order,
   type RepeatFilter,
 } from './results.ts'
 import {
@@ -31,12 +35,12 @@ import { StartScreen, type SlotView } from './StartScreen.tsx'
 
 type Key = 'A' | 'B'
 
-/** What the report holds: the list as filtered and searched, its first N rows, or the ticked rows. */
-type Scope = 'view' | 'top' | 'picked'
-const TOP_N = [10, 50, 100]
-const AMOUNT_LABEL: Record<'compare' | 'repeat', Record<Amount, string>> = {
-  compare: { summary: '요약표만', part: '대조 일부', full: '대조 전부' },
-  repeat: { summary: '요약표만', part: '위치 일부', full: '위치 전부' },
+/** A PDF being built: the page being drawn, or why it failed. */
+interface PdfJob {
+  run: Run<Blob>
+  page: number
+  pages: number
+  error?: string
 }
 
 type Screen =
@@ -68,11 +72,8 @@ export function App() {
   const [repeatFilter, setRepeatFilter] = useState<RepeatFilter>('all')
   const [selected, setSelected] = useState(0)
   const [query, setQuery] = useState('')
-  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
-  const [exporting, setExporting] = useState(false)
-  const [scope, setScope] = useState<Scope>('view')
-  const [top, setTop] = useState(TOP_N[0]!)
-  const [amount, setAmount] = useState<Amount>('full')
+  const [order, setOrder] = useState<Order>('chapter')
+  const [pdf, setPdf] = useState<PdfJob | null>(null)
   const [runError, setRunError] = useState<string | null>(null)
 
   // Nothing is saved, so leaving the page (reload, close, back) loses the loaded files and
@@ -134,7 +135,6 @@ export function App() {
     setCompareFilter('all')
     setRepeatFilter('all')
     setQuery('')
-    setPicked(new Set())
     setSelected(0)
     setScreen({ kind: 'analyzing', run, pct: 0, two: b !== null })
     run.result.then(
@@ -180,46 +180,34 @@ export function App() {
 
   const results = screen.kind === 'results' ? screen : null
 
-  // Report rows for the chosen scope; worked out only while the export overlay is open.
-  const report = useMemo(() => {
-    if (!exporting || !results) return null
-    const r = results.result
-    const choose = <T,>(all: T[], view: T[], key: (row: T) => string) => ({
-      // Findings before the MAX_RESULTS cap, so a capped report does not read as complete.
-      total: r.total,
-      view: view.length,
-      rows:
-        scope === 'picked'
-          ? all.filter((row) => picked.has(key(row)))
-          : scope === 'top'
-            ? view.slice(0, top)
-            : view,
-    })
-    return r.kind === 'compare'
-      ? {
-          kind: 'compare' as const,
-          ...choose(
-            r.matches,
-            searchMatches(filterMatches(r.matches, compareFilter), query),
-            matchKey,
-          ),
-        }
-      : {
-          kind: 'repeat' as const,
-          ...choose(r.groups, searchGroups(filterGroups(r.groups, repeatFilter), query), groupKey),
-        }
-  }, [exporting, results, scope, top, picked, compareFilter, repeatFilter, query])
-  // Indexing the manuscript again takes a moment on a long one, so it is done once per overlay.
-  const resultA = results?.result.kind === 'repeat' ? results.a : null
-  const context = useMemo(
-    () => (exporting && resultA ? contextOf(slotEngineText(resultA)) : null),
-    [exporting, resultA],
-  )
+  // Findings carry offsets into the text the search ran on; the same slot builds the same text.
+  const slotA = results?.a ?? null
+  const slotB = results?.b ?? null
+  const aroundA = useMemo(() => (slotA ? aroundOf(slotEngineText(slotA)) : null), [slotA])
+  const aroundB = useMemo(() => (slotB ? aroundOf(slotEngineText(slotB)) : null), [slotB])
 
-  const openExport = (): void => {
-    // Ticked rows are what the user most likely wants to export.
-    setScope((s) => (picked.size > 0 ? 'picked' : s === 'picked' ? 'view' : s))
-    setExporting(true)
+  // The report holds every finding, in the order the list shows, whatever the tab or search.
+  const startPdf = (): void => {
+    if (!results || !aroundA) return
+    const run = exportPdf(pdfInput(results, order, aroundA, aroundB), (page, pages) =>
+      setPdf((j) => (j && j.run === run ? { ...j, page, pages } : j)),
+    )
+    setPdf({ run, page: 0, pages: 0 })
+    run.result.then(
+      (blob) => {
+        // "2026. 9. 30." ends in a dot; the name would read "30..pdf".
+        download(blob, `유사도 검사 ${today().slice(0, -1)}.pdf`)
+        setPdf((j) => (j?.run === run ? null : j))
+      },
+      (err: unknown) => {
+        if (run.aborted) return
+        setPdf((j) => (j?.run === run ? { ...j, error: String(err) } : j))
+      },
+    )
+  }
+  const closePdf = (): void => {
+    pdf?.run.abort()
+    setPdf(null)
   }
 
   const listProps = {
@@ -230,8 +218,11 @@ export function App() {
     },
     selected,
     onSelect: setSelected,
-    picked,
-    onPick: setPicked,
+    order,
+    onOrder: (o: Order): void => {
+      setOrder(o)
+      setSelected(0)
+    },
   }
 
   return (
@@ -269,7 +260,7 @@ export function App() {
               >
                 새로 비교
               </button>
-              <button className="btn primary" onClick={openExport}>
+              <button className="btn primary" onClick={startPdf} disabled={pdf !== null}>
                 내보내기
               </button>
             </>
@@ -319,6 +310,8 @@ export function App() {
             titleA={results.a.title}
             titleB={results.b?.title ?? ''}
             rangeNote={rangeNote(results.a, results.b)}
+            aroundA={aroundA!}
+            aroundB={aroundB!}
             running={results.run !== null}
             stopped={results.stopped ?? false}
             filter={compareFilter}
@@ -333,6 +326,7 @@ export function App() {
           <RepeatView
             result={results.result}
             titleA={results.a.title}
+            around={aroundA!}
             running={results.run !== null}
             stopped={results.stopped ?? false}
             filter={repeatFilter}
@@ -345,80 +339,28 @@ export function App() {
         )}
       </main>
       {modal && <Modal {...modal} onNo={() => setModal(null)} />}
-      {report && results && (
-        <ExportOverlay
-          fileName={`유사도 검사 ${today()}`}
-          onClose={() => setExporting(false)}
-          options={
-            <>
-              <span className="opt">
-                범위
-                <span className="seg">
-                  <button className={scope === 'view' ? 'on' : ''} onClick={() => setScope('view')}>
-                    지금 목록 {report.view.toLocaleString()}개
-                  </button>
-                  {/* A div, not a button: a select inside a button does not open in every browser. */}
-                  <div className={scope === 'top' ? 'on' : ''} onClick={() => setScope('top')}>
-                    상위
-                    <select value={top} onChange={(e) => setTop(Number(e.target.value))}>
-                      {TOP_N.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    개
-                  </div>
-                  <button
-                    className={scope === 'picked' ? 'on' : ''}
-                    disabled={picked.size === 0}
-                    onClick={() => setScope('picked')}
-                  >
-                    선택한 {picked.size.toLocaleString()}개
-                  </button>
-                </span>
-              </span>
-              <span className="opt">
-                분량
-                <span className="seg">
-                  {(['summary', 'part', 'full'] as const).map((a) => (
-                    <button
-                      key={a}
-                      className={amount === a ? 'on' : ''}
-                      onClick={() => setAmount(a)}
-                    >
-                      {AMOUNT_LABEL[report.kind][a]}
-                    </button>
-                  ))}
-                </span>
-              </span>
-            </>
-          }
-        >
-          {report.kind === 'compare' ? (
-            <CompareReport
-              meta={{
-                date: today(),
-                a: manuscriptLine(results.a),
-                b: results.b ? manuscriptLine(results.b) : undefined,
-                scope: scopeLine(report.rows.length, report.total),
-              }}
-              rows={report.rows}
-              amount={amount}
-            />
-          ) : (
-            <RepeatReport
-              meta={{
-                date: today(),
-                a: manuscriptLine(results.a),
-                scope: scopeLine(report.rows.length, report.total),
-              }}
-              rows={report.rows}
-              amount={amount}
-              context={context!}
-            />
-          )}
-        </ExportOverlay>
+      {pdf && (
+        <div className="modal">
+          <div className="box">
+            <h3>{pdf.error ? 'PDF를 만들지 못했어요' : 'PDF 만드는 중'}</h3>
+            <p>
+              {pdf.error ??
+                (pdf.pages > 0
+                  ? `${pdf.page.toLocaleString()} / ${pdf.pages.toLocaleString()}쪽`
+                  : '쪽을 나누고 있어요…')}
+            </p>
+            {!pdf.error && (
+              <div className="bar">
+                <i style={{ width: `${pdf.pages > 0 ? (pdf.page / pdf.pages) * 100 : 0}%` }} />
+              </div>
+            )}
+            <div className="acts">
+              <button className="btn" onClick={closePdf}>
+                {pdf.error ? '닫기' : '취소'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )
@@ -448,11 +390,69 @@ function manuscriptLine(s: Slot): string {
   return b === null ? s.title : `${s.title} · ${b[0] === 1 ? '' : `${b[0]}~`}${b[1]}화`
 }
 
-/** Report line saying how much of the result it holds. */
-function scopeLine(n: number, total: number): string {
-  return n === total
-    ? `전체 ${total.toLocaleString()}개`
-    : `${total.toLocaleString()}개 중 ${n.toLocaleString()}개`
+/** Report data: every finding in list order, each side with the sentences around it. */
+function pdfInput(
+  r: { result: CompareResult | RepeatResult; a: Slot; b: Slot | null; stopped?: boolean },
+  order: Order,
+  aroundA: AroundFn,
+  aroundB: AroundFn | null,
+): PdfInput {
+  const manuscripts = [
+    { key: 'A' as const, title: manuscriptLine(r.a), files: r.a.files },
+    ...(r.b ? [{ key: 'B' as const, title: manuscriptLine(r.b), files: r.b.files }] : []),
+  ]
+  const stopped: [string, string][] = r.stopped ? [['참고', '중단됨 · 검사한 곳까지의 결과']] : []
+  const common = { date: today(), manuscripts }
+  if (r.result.kind === 'compare') {
+    const m = r.result.matches
+    const b = aroundB ?? aroundA
+    return {
+      ...common,
+      kind: 'compare',
+      heading: '유사도 검사 결과',
+      facts: [
+        [
+          '결과',
+          `회차 쌍 ${m.length.toLocaleString()}개 · 거의 동일 ${filterMatches(m, 'near').length.toLocaleString()}개 · 일부 수정 ${filterMatches(m, 'edited').length.toLocaleString()}개`,
+        ],
+        ['정렬', order === 'chapter' ? '회차순' : '유사도순'],
+        ...stopped,
+      ],
+      rows: sortMatches(m, order).map((x) => ({
+        title: `A ${chapterLabel(x.a)} ↔ B ${chapterLabel(x.b)}`,
+        tier: x.tier,
+        note: `${TIER_LABEL[x.tier]} · 유사 문장 ${x.count}개 · 구간 ${x.runs}개${x.runs > x.passages.length ? ` (상위 ${x.passages.length}개)` : ''}`,
+        passages: x.passages.map((p) => ({
+          a: {
+            label: `${chapterLabel(p.a.chapter)} · ${ordinal(p.a)}`,
+            ...aroundA(p.a.start, p.a.end),
+          },
+          b: { label: `${chapterLabel(p.b.chapter)} · ${ordinal(p.b)}`, ...b(p.b.start, p.b.end) },
+        })),
+      })),
+    }
+  }
+  const g = r.result.groups
+  return {
+    ...common,
+    kind: 'repeat',
+    heading: '내부 반복 검사 결과',
+    facts: [
+      [
+        '결과',
+        `반복 문장 ${g.length.toLocaleString()}개 · 3회 이상 ${filterGroups(g, 3).length.toLocaleString()}개 · 5회 이상 ${filterGroups(g, 5).length.toLocaleString()}개`,
+      ],
+      ['정렬', order === 'chapter' ? '회차순' : '반복 많은 순'],
+      ...stopped,
+    ],
+    rows: sortGroups(g, order).map((x) => ({
+      title: `${x.occurrences.length}회 · ${groupSpan(x)}`,
+      places: x.occurrences.map((o) => ({
+        label: o.chapter === null ? where(o) : `${where(o)} · ${ordinal(o)}`,
+        ...aroundA(o.start, o.end),
+      })),
+    })),
+  }
 }
 
 function today(): string {

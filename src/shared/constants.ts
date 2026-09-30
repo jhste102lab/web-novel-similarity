@@ -33,8 +33,5 @@ export const PROGRESS_EVERY = 500
 /** Findings stream to the UI at most this often; below ~250ms the regrouping cost shows up. */
 export const PARTIAL_EVERY_MS = 400
 
-/** A report is reviewed by a human; beyond this the strongest findings are kept and the rest
- * are only counted. Uncapped results reached ~600k passages (multi-GB DOM) on 2M-char pairs. */
-export const MAX_RESULTS = 3000
 /** Passages kept per chapter pair, strongest first. */
 export const MAX_PASSAGES_PER_MATCH = 20

@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { RepeatGroup, RepeatResult } from '../shared/types.ts'
+import { Context, type AroundFn } from './CompareView.tsx'
 import { CopyButton } from './CopyButton.tsx'
 import { ResultsShell, Tab, type ViewProps } from './ResultsShell.tsx'
 import {
-  cappedNote,
   filterGroups,
-  groupKey,
   groupSpan,
   searchGroups,
+  sortGroups,
   where,
   type RepeatFilter,
 } from './results.ts'
@@ -19,20 +19,21 @@ const MAX_OCCURRENCES = 100
 export function RepeatView({
   result,
   titleA,
+  around,
   filter,
   onFilter,
   query,
   onQuery,
   selected,
   onSelect,
-  picked,
-  onPick,
+  order,
+  onOrder,
   running,
   stopped,
-}: ViewProps<RepeatResult, RepeatFilter>) {
+}: ViewProps<RepeatResult, RepeatFilter> & { around: AroundFn }) {
   const rows = useMemo(
-    () => searchGroups(filterGroups(result.groups, filter), query),
-    [result, filter, query],
+    () => searchGroups(filterGroups(sortGroups(result.groups, order), filter), query),
+    [result, filter, query, order],
   )
   const count = (f: RepeatFilter): number => filterGroups(result.groups, f).length
   return (
@@ -53,13 +54,12 @@ export function RepeatView({
       rows={rows}
       selected={selected}
       onSelect={onSelect}
-      picked={picked}
-      onPick={onPick}
-      keyOf={groupKey}
+      order={order}
+      onOrder={onOrder}
+      scoreLabel="반복 많은 순"
       query={query}
       onQuery={onQuery}
       emptyText={query ? '찾는 조건에 맞는 결과가 없습니다.' : '의심되는 반복 문장이 없습니다.'}
-      capped={cappedNote(result.groups.length, result.total)}
       running={running}
       stopped={stopped}
       stats={result.stats}
@@ -76,12 +76,12 @@ export function RepeatView({
           </div>
         </>
       )}
-      renderDetail={(g) => <GroupDetail g={g} />}
+      renderDetail={(g) => <GroupDetail g={g} around={around} />}
     />
   )
 }
 
-function GroupDetail({ g }: { g: RepeatGroup }) {
+function GroupDetail({ g, around }: { g: RepeatGroup; around: AroundFn }) {
   // The pane remounts per row, so every group opens collapsed.
   const [all, setAll] = useState(false)
   const shown = all ? g.occurrences : g.occurrences.slice(0, MAX_OCCURRENCES)
@@ -93,12 +93,19 @@ function GroupDetail({ g }: { g: RepeatGroup }) {
         <CopyButton a={g.text} />
         <span className="where">{groupSpan(g)}</span>
       </div>
-      {shown.map((o, i) => (
-        <div key={i} className="occ">
-          <span className="ch">{where(o)}</span>
-          <span>{g.text}</span>
-        </div>
-      ))}
+      {shown.map((o, i) => {
+        const at = around(o.start, o.end)
+        return (
+          <div key={i} className="occ">
+            <span className="ch">{where(o)}</span>
+            <span>
+              <Context around={at}>
+                <mark>{at.text}</mark>
+              </Context>
+            </span>
+          </div>
+        )
+      })}
       {rest > 0 && (
         <button className="occ more" onClick={() => setAll(true)}>
           <span className="ch">…</span>

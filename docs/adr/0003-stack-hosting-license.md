@@ -2,6 +2,7 @@
 
 Status: Accepted (2026-09-21), amended during implementation (2026-09-21) —
 see _Amendments_. HWP 5 parsing added by ADR 0005 (2026-09-30).
+PDF export replaced by ADR 0007 (2026-09-30).
 
 ## Context
 

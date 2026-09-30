@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { ManuscriptText } from '../shared/types.ts'
 import { compare } from './compare.ts'
+import { aroundOf } from './context.ts'
 import { charDiff } from './diff.ts'
 import { boundedEditDistance } from './editDistance.ts'
 import { findRepeats } from './repeats.ts'
-import { indexSentences, sentenceText } from './sentences.ts'
+import { indexSentences } from './sentences.ts'
 
 const doc = (chapters: string[][]): ManuscriptText => {
   let text = ''
@@ -103,10 +104,11 @@ describe('findRepeats', () => {
     const r = findRepeats(m)
     expect(r.groups).toHaveLength(1)
     expect(r.groups[0]!.occurrences.map((o) => o.chapter)).toEqual([1, 2])
-    const idx = indexSentences(m.text, m.chapters)
-    expect(r.groups[0]!.occurrences.map((o) => sentenceText(idx, o.id))).toEqual([
-      '반복되는 문장이 있다.',
-      '반복되는 문장이 있다.',
+    const around = aroundOf(m)
+    expect(r.groups[0]!.occurrences.map((o) => around(o.start, o.end))).toEqual([
+      // Neighbours stay inside the chapter: before the first sentence of 1화 is its title line.
+      { before: '#1화', text: '반복되는 문장이 있다.', after: '반복되는 문장이 있다.' },
+      { before: '이야기는 계속된다.', text: '반복되는 문장이 있다.', after: '' },
     ])
   })
 })
