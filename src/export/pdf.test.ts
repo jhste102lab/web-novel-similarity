@@ -17,6 +17,7 @@ function recorder() {
 
 const side = (text: string, label = '1화 · 1번째 문장') => ({
   label,
+  link: '↔ B 6·30번째 문장',
   pieces: [{ text: '앞 문장이다.\n' }, { text, other: text }, { text: '\n뒤 문장이다.' }],
 })
 
@@ -40,7 +41,7 @@ describe('renderPdf', () => {
           blocks: [
             [
               { a: side(long), b: side(long) },
-              { a: null, b: side('겹친다.', '1화 · 9번째 문장') },
+              { a: side('겹친다.', '1화 · 9번째 문장'), b: side('겹친다.', '1화 · 9번째 문장') },
             ],
           ],
         },
@@ -53,13 +54,16 @@ describe('renderPdf', () => {
     const footers = r.texts.filter((t) => / \/ \d+$/.test(t.t)).map((t) => t.t)
     expect(footers).toEqual(Array.from({ length: pages }, (_, i) => `${i + 1} / ${pages}`))
     expect(r.texts.filter((t) => t.t.endsWith('(계속)'))).toHaveLength(pages - 1)
-    // A row with one side draws only that side's box.
+    // Each box's heading: its label and the other side's sentences, once per box.
     const labels = r.texts.filter((t) => t.t.endsWith('번째 문장'))
-    expect(labels.map((t) => t.t)).toEqual([
-      '1화 · 1번째 문장',
-      '1화 · 1번째 문장',
-      '1화 · 9번째 문장',
-    ])
+    expect(labels.map((t) => t.t).sort()).toEqual(
+      [
+        ...Array<string>(2).fill('1화 · 1번째 문장'),
+        ...Array<string>(2).fill('↔ B 6·30번째 문장'),
+        ...Array<string>(2).fill('1화 · 9번째 문장'),
+        ...Array<string>(2).fill('↔ B 6·30번째 문장'),
+      ].sort(),
+    )
     // Nothing runs past the right margin (A4 width minus 40 pt) or into the footer rule.
     for (const t of r.texts) {
       expect(t.x + [...t.t].length * 0.6 * t.size).toBeLessThanOrEqual(595.28 - 40 + 0.01)

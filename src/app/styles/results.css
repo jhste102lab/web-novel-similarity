@@ -208,9 +208,6 @@
 .detail .blk .cmp + .cmp {
   margin-top: 8px;
 }
-.pane.none {
-  visibility: hidden;
-}
 .pane .lnk {
   white-space: normal;
   font-size: 12px;

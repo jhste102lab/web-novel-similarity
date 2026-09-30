@@ -32,3 +32,8 @@ two manuscripts per run.
   precise comparison is mandatory (no all-pairs comparison).
 - Adding local persistence (IndexedDB) later is cheap; adding a server is a
   policy change and needs a new ADR.
+- The build enforces it with a Content-Security-Policy (`connect-src 'self'`,
+  scripts, workers and fonts from this origin only; `vite.config.ts`), so even
+  a faulty or compromised dependency cannot send text elsewhere. Added
+  2026-09-30 after the owner asked for proof that preview and export send
+  nothing.

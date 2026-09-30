@@ -8,7 +8,7 @@ import { runInWorker, type Run } from '../worker/client.ts'
 import { AnalyzingScreen } from './AnalyzingScreen.tsx'
 import { Modal, type ModalProps } from './Modal.tsx'
 import { RepeatView } from './RepeatView.tsx'
-import { CompareView, type FileFn } from './CompareView.tsx'
+import { CompareView } from './CompareView.tsx'
 import {
   chapterLabel,
   filterGroups,
@@ -20,6 +20,7 @@ import {
   TIER_LABEL,
   where,
   type CompareFilter,
+  type FileFn,
   type Order,
   type RepeatFilter,
 } from './results.ts'

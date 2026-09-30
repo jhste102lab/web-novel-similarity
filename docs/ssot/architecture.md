@@ -15,7 +15,12 @@ browser tab
 No network requests after the page loads, except the lazily loaded chunks of
 this site. Parsing happens on the main thread (HWPX needs `DOMParser`;
 `mammoth` and rhwp are loaded on demand); only the extracted text goes to the
-worker.
+worker. The build adds a Content-Security-Policy meta tag (`vite.config.ts`,
+build only): scripts, styles, fonts, workers and `fetch` are limited to this
+origin (`'wasm-unsafe-eval'` for rhwp), the PDF preview frame to `blob:`, and
+no forms or `<base>`. A checked run (two HWP files, compare, detail, preview,
+save) made only same-origin GETs for the site's own files and no CSP reports.
+Chrome's PDF viewer loads its own `chrome-extension://` resources.
 
 ## File map
 
@@ -179,7 +184,7 @@ The two result views (`CompareView`, `RepeatView`) share `ResultsShell` in `src/
 - **Sorting** — `.sortbar` above the list offers 회차순 (default: A chapter then B chapter for comparison; first occurrence offset for repeats) and 유사도순 / 반복 많은 순 (engine order). `Order = 'chapter' | 'score'`, `sortMatches` and `sortGroups` live in `results.ts`; `App.tsx` owns the order, also used by the PDF.
 - **Keyboard** — `j`/`k`/arrows, `g`/`G`, `/` to search, `c` to copy, `d` for diagnostics, `?` for the sheet. There are no export checkboxes or row-selection shortcuts.
 - **Context** — comparison passages and repeat places show up to four sentences before and after in dimmed `.ctx` text, never marked. `aroundOf(ManuscriptText)` returns `(start, end) => { before, text, after }` from `engine/context.ts`; chapter segment boundaries are found by offset, not label. `before`/`after` are raw slices that keep the manuscript's line breaks (runs of blank lines collapse to one) and carry their own separator, so views concatenate them without adding spaces; panes and repeat places use `white-space: pre-line`. Short sentence pieces count; neighbours beyond the 1,000-character lookup reach show only their nearer part.
-- **Joined context** — `joinOf(ManuscriptText)` in `engine/context.ts` takes a chapter pair's finding spans and returns `Joined[]`: spans whose context bounds overlap become one stretch, split into context and finding `pieces` (finding pieces carry their span index). `blocksOf` in `src/app/blocks.ts` joins A and B spans separately and links stretches through findings (union-find) into blocks. A block is rows of `{ a, b }` boxes (`PdfBlock`): each A stretch in reading order, beside the first B stretch whose first matched A stretch it is; further such B stretches get rows with `a: null`. Each box has `label` (`원본.txt · 12화 · 3·5번째 문장`), `link` (`↔ B 6·30번째 문장`) and `pieces`; a finding matched in several places is marked against the first. The detail pane (`MatchDetail` in `CompareView.tsx`, one `.blk` per block, `.pane.none` for an empty side) and the report use the same blocks.
+- **Joined context** — `joinOf(ManuscriptText)` in `engine/context.ts` takes a chapter pair's finding spans and returns `Joined[]`: spans whose context bounds overlap become one stretch, split into context and finding `pieces` (finding pieces carry their span index). `blocksOf` in `src/app/blocks.ts` joins A and B spans separately and links stretches through findings (union-find) into blocks. A block is rows of `{ a, b }` boxes (`PdfBlock`), one row per linked (A stretch, B stretch) pair in A then B reading order. A stretch's first row shows it whole with `label` (`원본.txt · 12화 · 3·5번째 문장`), `link` (`↔ B 6·30번째 문장`) and its `pieces`, a finding matched in several places marked against the first; later rows show only its sentences linked to that row's other box (`↑ 위에 나온 칸 · 겹친 문장만`). The detail pane (`MatchDetail` in `CompareView.tsx`, one `.blk` per block) and the report use the same blocks.
 - **File names** — `slotFileAt(slot)` (`src/app/slot.ts`) maps an engine-text offset to its source file (`Part.file`), in `engineOrder`. The comparison detail header reads `A 원본.txt ↔ B 편집본.txt`, a `.cmp.chs` row puts each side's 회차 over its column, and each pane is labelled `A 원본.txt · 3화 · 1번째 문장`.
 - **Loading files** — `loadSlot(files, onProgress)` yields a frame before parsing and then at most every 50 ms, so the slot card's `.slot.loading` spinner (a compositor-driven CSS rotation) and, for many files, `n / N개` with a bar are painted while files are read.
 - **Repeat detail** — the first 100 places of a group are listed; `외 N곳 더 보기` lists the rest.
@@ -216,8 +221,8 @@ repeats include every place.
 
 Measured in Chrome on an M5 Mac (production build via Vite preview): the
 26 chapter pairs in `docs/samples` produced 62 pages, 0.33 MB; the preview
-opened in ~0.2 s. The synthetic worst case produced 134,926 pages, 460 MB: the
-preview took 25 s and the saved file 191 s (`docs/benchmark.md`).
+opened in ~0.2 s. The synthetic worst case produced 141,131 pages, 487 MB: the
+preview took 27 s and the saved file 209 s (`docs/benchmark.md`).
 
 ## Build and deploy
 

@@ -16,11 +16,10 @@ import {
   TIER_CLASS,
   TIER_LABEL,
   type CompareFilter,
+  type FileFn,
 } from './results.ts'
 
 export type AroundFn = (start: number, end: number) => Around
-/** The file an engine-text offset came from. */
-export type FileFn = (pos: number) => string
 
 interface Props extends ViewProps<CompareResult, CompareFilter> {
   titleB: string
@@ -175,17 +174,18 @@ function MatchDetail({
 }
 
 /** One side's stretch: neighbours dimmed, each finding marked against the text it matched. */
-function Stretch({ side, k }: { side: PdfSide | null; k: 'A' | 'B' }) {
-  if (!side) return <div className="pane none" />
+function Stretch({ side, k }: { side: PdfSide; k: 'A' | 'B' }) {
   const found = side.pieces.filter((p) => typeof p.other === 'string')
   return (
     <div className="pane">
       <div className="k">
         <b>{k}</b> {side.label}
-        <CopyButton
-          a={found.map((p) => (k === 'A' ? p.text : p.other)).join('\n')}
-          b={found.map((p) => (k === 'A' ? p.other : p.text)).join('\n')}
-        />
+        {k === 'A' && (
+          <CopyButton
+            a={found.map((p) => p.text).join('\n')}
+            b={found.map((p) => p.other).join('\n')}
+          />
+        )}
       </div>
       <div className="lnk">{side.link}</div>
       {side.pieces.map((p, i) =>

@@ -47,6 +47,9 @@ export function sortGroups(groups: RepeatGroup[], order: Order): RepeatGroup[] {
     : groups.toSorted((x, y) => x.occurrences[0]!.start - y.occurrences[0]!.start)
 }
 
+/** The file an engine-text offset came from. */
+export type FileFn = (pos: number) => string
+
 /** "127화", or "본문" for a manuscript without chapters. */
 export function chapterLabel(chapter: number | null): string {
   return chapter === null ? '본문' : `${chapter}화`

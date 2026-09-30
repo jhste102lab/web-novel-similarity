@@ -70,7 +70,7 @@ Product (2026-09-21, design accepted):
   `PDF로 저장할까요?`, then builds the whole report (the active tab's findings,
   in the list's current sort order; search ignored) and downloads it.
 - Privacy is shown, not explained: one line under the title
-  (`파일은 서버에 저장하지 않고 사용자의 브라우저에서만 처리됩니다`).
+  (`올려주신 파일은 사용자의 브라우저로만 처리되며 외부 서버로 전송되지 않습니다.`).
 - Persistence: memory only. Refresh discards results. No JSON save/reopen.
 - File dates: only `File.lastModified` is available in a browser, shown as
   `파일 수정일`. Creation date needs the future desktop build.
@@ -164,9 +164,12 @@ Review (2026-09-30 #4, owner feedback on the PDF):
   (owner's choice among mocked options, 2026-09-30): findings whose context
   overlaps are joined into one stretch with several marks (`14·16번째 문장`);
   stretches linked by a finding form a block. Each stretch is its own tinted
-  box naming the other side's sentences it matched (`↔ B 6·30번째 문장`). A B
-  stretch sits beside the first A stretch it matched, whatever its position in
-  B; further B stretches for that A stretch follow in rows of their own.
+  box naming the other side's sentences it matched (`↔ B 6·30번째 문장`). Each
+  row pairs one A stretch with one B stretch that matched it, so no box stands
+  beside nothing; a stretch already shown whole appears in later rows as only
+  its sentences matching that row (`↑ 위에 나온 칸 · 겹친 문장만`).
+- The report and the page may fetch only this site's own files: the build sets
+  a Content-Security-Policy with `connect-src 'self'` (see `vite.config.ts`).
 
 ## Open decisions
 

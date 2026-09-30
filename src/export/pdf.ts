@@ -21,10 +21,10 @@ export interface PdfSide {
   pieces: PdfPiece[]
 }
 /**
- * Stretches of one chapter pair linked by findings, each text once, in rows of boxes; a row
- * pairs an A stretch with a B stretch it matched where it can, a side runs out with null.
+ * Stretches of one chapter pair linked by findings, in rows: each row an A box beside the B box
+ * it matched. A stretch is shown whole once; later rows repeat only its matching sentences.
  */
-export type PdfBlock = { a: PdfSide | null; b: PdfSide | null }[]
+export type PdfBlock = { a: PdfSide; b: PdfSide }[]
 export interface PdfMatch {
   /** "원본.txt · 12화", one per side. */
   a: string
@@ -381,12 +381,12 @@ function cover(l: Layout, input: PdfInput): void {
 }
 
 /** Tinted boxes of one row, side by side; split over pages, the heading only on top. */
-function boxes(l: Layout, sides: Record<Key, PdfSide | null>, again: () => void): void {
+function boxes(l: Layout, sides: Record<Key, PdfSide>, again: () => void): void {
   const lines = {
-    A: sides.A ? l.wrap(pieceRuns(sides.A, 'A'), COL - PAD * 2, BODY) : [],
-    B: sides.B ? l.wrap(pieceRuns(sides.B, 'B'), COL - PAD * 2, BODY) : [],
+    A: l.wrap(pieceRuns(sides.A, 'A'), COL - PAD * 2, BODY),
+    B: l.wrap(pieceRuns(sides.B, 'B'), COL - PAD * 2, BODY),
   }
-  const top0 = sides.A?.link || sides.B?.link ? HEAD + LINK : HEAD
+  const top0 = sides.A.link || sides.B.link ? HEAD + LINK : HEAD
   const rows = Math.max(lines.A.length, lines.B.length)
   let i = 0
   while (i < rows) {
@@ -400,7 +400,6 @@ function boxes(l: Layout, sides: Record<Key, PdfSide | null>, again: () => void)
       ['B', LEFT + COL + GAP],
     ] as const) {
       const side = sides[key]
-      if (!side) continue
       l.c?.rect(x, top, COL, h, SIDE[key].bg)
       if (head) {
         const w = COL - PAD * 2 - 18

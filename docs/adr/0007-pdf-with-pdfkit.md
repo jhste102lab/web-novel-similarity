@@ -50,8 +50,8 @@ out when the next one starts.
 - Every browser gets the same pages. Text stays selectable and searchable.
 - Opening an export costs a 2.7 MB font fetch (then cached) and a 0.5 MB worker.
 - The synthetic worst case (168,083 chapter pairs, `docs/benchmark.md`) gives
-  134,926 pages with each stretch in its own aligned box (111,681 with joined
-  stretches stacked per side, 134,385 with one box per passage); see the
-  benchmark for time and size.
+  141,131 pages with one row per linked A/B stretch pair (134,385 with one box
+  per passage before findings were joined); see the benchmark for time, size
+  and the layouts tried in between.
 - Marks use one colour for text both sides share; the report has no summary
   table any more (a finding list is the report).

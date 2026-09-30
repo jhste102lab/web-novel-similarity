@@ -15,7 +15,7 @@ const span = (m: ManuscriptText, ls: string[], i: number): Span => {
 }
 
 describe('blocksOf', () => {
-  it('shows each text once and puts a B stretch beside the first A stretch it matched', () => {
+  it('puts every box beside what it matched and shows each stretch whole only once', () => {
     const la = lines('가')
     const lb = lines('나')
     const A = doc(la)
@@ -34,12 +34,16 @@ describe('blocksOf', () => {
       () => 'b.txt',
     )
     expect(blocks).toHaveLength(1)
-    const rows = blocks[0]!.map((r) => [r.a?.label ?? null, r.b?.label ?? null])
+    const rows = blocks[0]!.map((r) => [r.a.label, r.b.label])
     expect(rows).toEqual([
       ['a.txt · 1화 · 3·5번째 문장', 'b.txt · 1화 · 31·32번째 문장'],
       ['a.txt · 1화 · 21번째 문장', 'b.txt · 1화 · 6번째 문장'],
+      // Both stretches were shown above: only the sentences this row links.
+      ['a.txt · 1화 · 21번째 문장', 'b.txt · 1화 · 31번째 문장'],
     ])
-    expect(blocks[0]![0]!.a!.link).toBe('↔ B 31·32번째 문장')
-    expect(blocks[0]![1]!.a!.link).toBe('↔ B 6·31번째 문장')
+    expect(blocks[0]![0]!.a.link).toBe('↔ B 31·32번째 문장')
+    expect(blocks[0]![1]!.a.link).toBe('↔ B 6·31번째 문장')
+    expect(blocks[0]![2]!.b.pieces).toEqual([{ text: lb[30], other: la[20] }])
+    expect(blocks[0]![2]!.b.link).toBe('↑ 위에 나온 칸 · 겹친 문장만')
   })
 })

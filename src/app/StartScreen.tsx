@@ -42,7 +42,9 @@ export function StartScreen({
         <span className="off">원고 두 개 비교</span>
       </div>
       <h1>원고를 올려 주세요</h1>
-      <div className="sub">파일은 서버에 저장하지 않고 사용자의 브라우저에서만 처리됩니다</div>
+      <div className="sub">
+        올려주신 파일은 사용자의 브라우저로만 처리되며 외부 서버로 전송되지 않습니다.
+      </div>
       <div className={`slots ${two ? '' : 'one'}`}>
         <SlotCard
           slotKey="A"
