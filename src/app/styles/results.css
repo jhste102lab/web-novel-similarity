@@ -162,6 +162,12 @@
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+.detail .head .pct .f {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--meta);
+  letter-spacing: 0;
+}
 .detail .head .tier {
   font-weight: 600;
 }

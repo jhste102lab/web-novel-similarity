@@ -36,9 +36,9 @@ describe('renderPdf', () => {
       facts: [],
       rows: [
         {
-          title: 'A 1화 ↔ B 1화',
+          a: 'a.txt · 1화',
+          b: 'b.txt · 1화',
           tier: 'near',
-          note: '',
           passages: [{ a: side(long), b: side(long) }],
         },
       ],
@@ -50,8 +50,10 @@ describe('renderPdf', () => {
     const footers = r.texts.filter((t) => / \/ \d+$/.test(t.t)).map((t) => t.t)
     expect(footers).toEqual(Array.from({ length: pages }, (_, i) => `${i + 1} / ${pages}`))
     expect(r.texts.filter((t) => t.t.endsWith('(계속)'))).toHaveLength(pages - 1)
-    // Nothing runs past the right margin (A4 width minus 40 pt).
-    for (const t of r.texts)
+    // Nothing runs past the right margin (A4 width minus 40 pt) or into the footer rule.
+    for (const t of r.texts) {
       expect(t.x + [...t.t].length * 0.6 * t.size).toBeLessThanOrEqual(595.28 - 40 + 0.01)
+      if (!/ \/ \d+$|^2026/.test(t.t)) expect(t.y).toBeLessThanOrEqual(841.89 - 40)
+    }
   })
 })

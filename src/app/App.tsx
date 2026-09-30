@@ -7,7 +7,7 @@ import { runInWorker, type Run } from '../worker/client.ts'
 import { AnalyzingScreen } from './AnalyzingScreen.tsx'
 import { Modal, type ModalProps } from './Modal.tsx'
 import { RepeatView } from './RepeatView.tsx'
-import { CompareView, type AroundFn } from './CompareView.tsx'
+import { CompareView, type AroundFn, type FileFn } from './CompareView.tsx'
 import {
   chapterLabel,
   filterGroups,
@@ -16,7 +16,6 @@ import {
   ordinal,
   sortGroups,
   sortMatches,
-  TIER_LABEL,
   where,
   type CompareFilter,
   type Order,
@@ -28,6 +27,7 @@ import {
   rangeLabel,
   RejectedFilesError,
   slotEngineText,
+  slotFileAt,
   slotBounds,
   type Slot,
 } from './slot.ts'
@@ -35,11 +35,12 @@ import { StartScreen, type SlotView } from './StartScreen.tsx'
 
 type Key = 'A' | 'B'
 
-/** A PDF being built: the page being drawn, or why it failed. */
+/** A PDF being built (the page being drawn), built (its preview URL), or why it failed. */
 interface PdfJob {
   run: Run<Blob>
   page: number
   pages: number
+  done?: { blob: Blob; url: string }
   error?: string
 }
 
@@ -61,7 +62,7 @@ type Screen =
 const REPO = 'https://github.com/jhste102lab/web-novel-similarity'
 
 export function App() {
-  const [two, setTwo] = useState(false)
+  const [two, setTwo] = useState(true)
   const [slots, setSlots] = useState<Record<Key, SlotView>>({
     A: { slot: null, error: null },
     B: { slot: null, error: null },
@@ -185,20 +186,22 @@ export function App() {
   const slotB = results?.b ?? null
   const aroundA = useMemo(() => (slotA ? aroundOf(slotEngineText(slotA)) : null), [slotA])
   const aroundB = useMemo(() => (slotB ? aroundOf(slotEngineText(slotB)) : null), [slotB])
+  const fileA = useMemo(() => (slotA ? slotFileAt(slotA) : null), [slotA])
+  const fileB = useMemo(() => (slotB ? slotFileAt(slotB) : null), [slotB])
 
   // The report holds every finding, in the order the list shows, whatever the tab or search.
+  // It opens as a preview; saving asks first.
   const startPdf = (): void => {
-    if (!results || !aroundA) return
-    const run = exportPdf(pdfInput(results, order, aroundA, aroundB), (page, pages) =>
+    if (!results || !aroundA || !fileA) return
+    const run = exportPdf(pdfInput(results, order, aroundA, aroundB, fileA, fileB), (page, pages) =>
       setPdf((j) => (j && j.run === run ? { ...j, page, pages } : j)),
     )
     setPdf({ run, page: 0, pages: 0 })
     run.result.then(
-      (blob) => {
-        // "2026. 9. 30." ends in a dot; the name would read "30..pdf".
-        download(blob, `유사도 검사 ${today().slice(0, -1)}.pdf`)
-        setPdf((j) => (j?.run === run ? null : j))
-      },
+      (blob) =>
+        setPdf((j) =>
+          j?.run === run ? { ...j, done: { blob, url: URL.createObjectURL(blob) } } : j,
+        ),
       (err: unknown) => {
         if (run.aborted) return
         setPdf((j) => (j?.run === run ? { ...j, error: String(err) } : j))
@@ -207,8 +210,16 @@ export function App() {
   }
   const closePdf = (): void => {
     pdf?.run.abort()
+    if (pdf?.done) URL.revokeObjectURL(pdf.done.url)
     setPdf(null)
   }
+  // "2026. 9. 30." ends in a dot; the name would read "30..pdf".
+  const pdfName = `유사도 검사 ${today().slice(0, -1)}.pdf`
+  const savePdf = (): void =>
+    confirm('PDF로 저장할까요?', `${pdfName} · ${pdf?.pages.toLocaleString()}쪽`, () => {
+      if (pdf?.done) download(pdf.done.blob, pdfName)
+      closePdf()
+    })
 
   const listProps = {
     query,
@@ -312,6 +323,8 @@ export function App() {
             rangeNote={rangeNote(results.a, results.b)}
             aroundA={aroundA!}
             aroundB={aroundB!}
+            fileA={fileA!}
+            fileB={fileB!}
             running={results.run !== null}
             stopped={results.stopped ?? false}
             filter={compareFilter}
@@ -338,8 +351,24 @@ export function App() {
           />
         )}
       </main>
-      {modal && <Modal {...modal} onNo={() => setModal(null)} />}
-      {pdf && (
+      {pdf?.done && (
+        <div className="ov">
+          <div className="panel">
+            <div className="ph">
+              <h2>내보내기</h2>
+              <span className="est">{pdf.pages.toLocaleString()}쪽</span>
+              <button className="btn primary" onClick={savePdf}>
+                PDF로 저장
+              </button>
+              <button className="x" onClick={closePdf}>
+                ×
+              </button>
+            </div>
+            <iframe title="PDF 미리보기" src={pdf.done.url} />
+          </div>
+        </div>
+      )}
+      {pdf && !pdf.done && (
         <div className="modal">
           <div className="box">
             <h3>{pdf.error ? 'PDF를 만들지 못했어요' : 'PDF 만드는 중'}</h3>
@@ -362,6 +391,7 @@ export function App() {
           </div>
         </div>
       )}
+      {modal && <Modal {...modal} onNo={() => setModal(null)} />}
     </>
   )
 }
@@ -396,6 +426,8 @@ function pdfInput(
   order: Order,
   aroundA: AroundFn,
   aroundB: AroundFn | null,
+  fileA: FileFn,
+  fileB: FileFn | null,
 ): PdfInput {
   const manuscripts = [
     { key: 'A' as const, title: manuscriptLine(r.a), files: r.a.files },
@@ -406,6 +438,7 @@ function pdfInput(
   if (r.result.kind === 'compare') {
     const m = r.result.matches
     const b = aroundB ?? aroundA
+    const fb = fileB ?? fileA
     return {
       ...common,
       kind: 'compare',
@@ -418,18 +451,24 @@ function pdfInput(
         ['정렬', order === 'chapter' ? '회차순' : '유사도순'],
         ...stopped,
       ],
-      rows: sortMatches(m, order).map((x) => ({
-        title: `A ${chapterLabel(x.a)} ↔ B ${chapterLabel(x.b)}`,
-        tier: x.tier,
-        note: `${TIER_LABEL[x.tier]} · 유사 문장 ${x.count}개 · 구간 ${x.runs}개${x.runs > x.passages.length ? ` (상위 ${x.passages.length}개)` : ''}`,
-        passages: x.passages.map((p) => ({
-          a: {
-            label: `${chapterLabel(p.a.chapter)} · ${ordinal(p.a)}`,
-            ...aroundA(p.a.start, p.a.end),
-          },
-          b: { label: `${chapterLabel(p.b.chapter)} · ${ordinal(p.b)}`, ...b(p.b.start, p.b.end) },
-        })),
-      })),
+      rows: sortMatches(m, order).map((x) => {
+        const first = x.passages[0]!
+        return {
+          a: `${fileA(first.a.start)} · ${chapterLabel(x.a)}`,
+          b: `${fb(first.b.start)} · ${chapterLabel(x.b)}`,
+          tier: x.tier,
+          passages: x.passages.map((p) => ({
+            a: {
+              label: `${fileA(p.a.start)} · ${chapterLabel(p.a.chapter)} · ${ordinal(p.a)}`,
+              ...aroundA(p.a.start, p.a.end),
+            },
+            b: {
+              label: `${fb(p.b.start)} · ${chapterLabel(p.b.chapter)} · ${ordinal(p.b)}`,
+              ...b(p.b.start, p.b.end),
+            },
+          })),
+        }
+      }),
     }
   }
   const g = r.result.groups

@@ -13,7 +13,7 @@ Owning documents: this file (terms and settled product decisions),
 | ----------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 원고 (Manuscript)             | One logical work loaded into a slot (A or B).                                       | Built from one file or many files; always one text with chapter offsets. 500 `.txt` files dropped into slot A become one 원고 with 500 회차.                                                                                        |
 | 회차 (Chapter)                | A numbered episode inside a 원고.                                                   | Detected, never configured. See "Chapter detection". A 원고 may have no 회차; positions are then reported by sentence index.                                                                                                        |
-| 검사 모드 (Mode)              | `A/B 비교` (two slots) or `내부 반복` (slot A only).                                | Chosen with the `원고 두 개 비교` switch on the start screen; the page opens with it off (내부 반복).                                                                                                                               |
+| 검사 모드 (Mode)              | `A/B 비교` (two slots) or `내부 반복` (slot A only).                                | Chosen with the `원고 두 개 비교` switch on the start screen; the page opens with it on (A/B 비교).                                                                                                                                 |
 | 검사 범위 (Range)             | Inclusive chapter interval per 원고 that the check covers.                          | Dual-handle slider under each filled card; default = all. Rows outside the range are dimmed in the file list. Absent when the 원고 has no 회차.                                                                                     |
 | 유사 구간 (Passage)           | A run of consecutive matched sentences on both sides.                               | Evidence unit inside a 회차 쌍; one matched sentence is a passage of length 1. Never a top-level row.                                                                                                                               |
 | 회차 쌍 (Chapter match)       | One 회차 of A and one 회차 of B with every 유사 구간 between them.                  | Primary result unit in `A/B 비교`. A 원고 without 회차 yields a single pair labelled `본문`.                                                                                                                                        |
@@ -65,8 +65,9 @@ Product (2026-09-21, design accepted):
   tabs: 전체 / 거의 동일 / 일부 수정 (A/B) and 전체 / 3회 이상 / 5회 이상 (내부 반복).
 - Only suspicions are shown. Below 일부 수정 and every 흔한 표현 is removed by
   the engine, and no similarity percentage is displayed anywhere.
-- Export: 내보내기 immediately builds and downloads a PDF of every finding,
-  in the list's current sort order, regardless of tab or search.
+- Export: 내보내기 builds a PDF of every finding, in the list's current sort
+  order, regardless of tab or search, and shows it in the browser's PDF
+  viewer; `PDF로 저장` asks `PDF로 저장할까요?` before downloading.
 - Privacy is shown, not explained: one line under the title
   (`파일은 서버에 저장하지 않고 사용자의 브라우저에서만 처리됩니다`).
 - Persistence: memory only. Refresh discards results. No JSON save/reopen.
@@ -101,7 +102,8 @@ Review (2026-09-22, after hands-on use):
 
 Review (2026-09-30):
 
-- The page opens in 내부 반복 (one slot); `원고 두 개 비교` turns on A/B.
+- The page opens in A/B 비교 (Review #4; earlier 내부 반복);
+  `원고 두 개 비교` switches to one slot.
 - The header title returns to the start screen. Loaded files stay; results
   are discarded after a confirm dialog (`처음으로 갈까요?`, or
   `검사를 중단하고 처음으로 갈까요?` while a scan runs).
@@ -114,14 +116,14 @@ Review (2026-09-30 #2, shared-text marks; updated after real-result feedback):
 - Result order defaults to 회차순; the list's sort bar also offers 유사도순
   for comparison and 반복 많은 순 for repeats. The PDF follows this order.
 - Marks show what the two sides **share**, in the detail pane and the PDF
-  (earlier: what differed). Comparison passages and repeat places show the
-  neighbouring sentences on screen and in the PDF, dimmed and never marked.
+  (earlier: what differed). Comparison passages and repeat places show two
+  neighbouring sentences a side on screen and in the PDF, dimmed and never
+  marked.
 - Export is a PDF of every finding, independent of tab and search. No export
-  scope or amount options, image export, preview or row selection remains.
+  scope or amount options, image export or row selection remains.
 - Every chapter pair and repeat group is kept; there is no result cap.
   The strongest 20 passages per chapter pair are still retained.
 - A repeat's detail lists 100 places and then `외 N곳 더 보기`.
-- The report has no coloured side bar; tier dots and marks print in colour.
 - The HWP 5 reader is fetched right after the page loads and precached for
   offline use, so the first HWP file rarely waits for it (ADR 0006).
 
@@ -138,6 +140,17 @@ Review (2026-09-30 #3, owner feedback on real results):
 - Show every finding; remove the 3,000-result limit and its hidden-results note.
 - Include A/B file names and a current/total page footer such as `3 / 100`.
 - Reference: a KCI/CopyKiller report PDF, used for layout ideas only.
+
+Review (2026-09-30 #4, owner feedback on the PDF):
+
+- A/B labels carry the source file: detail header and panes
+  (`A 원본.txt · 3화 · 1번째 문장`) and the PDF bands and columns.
+- PDF: first page is a ruled table (검사일 / 원고 A / 원고 B / 결과), each
+  manuscript tinted in its colour (A blue, B green); passages sit in tinted
+  A/B columns with a lettered chip. The per-pair note
+  (`일부 수정 · 유사 문장 N개 · 구간 M개`) is dropped; the tier dot stays and
+  the legend names it.
+- 내보내기 shows the finished PDF first; saving is confirmed with 예/아니오.
 
 ## Open decisions
 

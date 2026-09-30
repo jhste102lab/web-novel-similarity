@@ -18,12 +18,16 @@ import {
 } from './results.ts'
 
 export type AroundFn = (start: number, end: number) => Around
+/** The file an engine-text offset came from. */
+export type FileFn = (pos: number) => string
 
 interface Props extends ViewProps<CompareResult, CompareFilter> {
   titleB: string
   rangeNote: string | null
   aroundA: AroundFn
   aroundB: AroundFn
+  fileA: FileFn
+  fileB: FileFn
 }
 /** A ↔ B results: one row per chapter pair, the detail pane shows its passages side by side. */
 export function CompareView({
@@ -33,6 +37,8 @@ export function CompareView({
   rangeNote,
   aroundA,
   aroundB,
+  fileA,
+  fileB,
   filter,
   onFilter,
   query,
@@ -112,7 +118,9 @@ export function CompareView({
           </div>
         </>
       )}
-      renderDetail={(m) => <MatchDetail m={m} aroundA={aroundA} aroundB={aroundB} />}
+      renderDetail={(m) => (
+        <MatchDetail m={m} aroundA={aroundA} aroundB={aroundB} fileA={fileA} fileB={fileB} />
+      )}
     />
   )
 }
@@ -121,16 +129,22 @@ function MatchDetail({
   m,
   aroundA,
   aroundB,
+  fileA,
+  fileB,
 }: {
   m: ChapterMatch
   aroundA: AroundFn
   aroundB: AroundFn
+  fileA: FileFn
+  fileB: FileFn
 }) {
+  const first = m.passages[0]!
   return (
     <>
       <div className="head">
         <span className="pct">
-          A {chapterLabel(m.a)} ↔ B {chapterLabel(m.b)}
+          A <span className="f">{fileA(first.a.start)}</span> {chapterLabel(m.a)} ↔ B{' '}
+          <span className="f">{fileB(first.b.start)}</span> {chapterLabel(m.b)}
         </span>
         <span className="tier">{TIER_LABEL[m.tier]}</span>
         <span className="where">
@@ -139,7 +153,14 @@ function MatchDetail({
         </span>
       </div>
       {m.passages.map((p, i) => (
-        <PassagePair key={i} p={p} aroundA={aroundA} aroundB={aroundB} />
+        <PassagePair
+          key={i}
+          p={p}
+          aroundA={aroundA}
+          aroundB={aroundB}
+          fileA={fileA}
+          fileB={fileB}
+        />
       ))}
     </>
   )
@@ -149,10 +170,14 @@ function PassagePair({
   p,
   aroundA,
   aroundB,
+  fileA,
+  fileB,
 }: {
   p: Passage
   aroundA: AroundFn
   aroundB: AroundFn
+  fileA: FileFn
+  fileB: FileFn
 }) {
   const diff = useMemo(() => charDiff(p.a.text, p.b.text), [p])
   const a = aroundA(p.a.start, p.a.end)
@@ -161,7 +186,7 @@ function PassagePair({
     <div className="cmp">
       <div className="pane">
         <div className="k">
-          <b>A</b> {ordinal(p.a)}
+          <b>A</b> {fileA(p.a.start)} · {chapterLabel(p.a.chapter)} · {ordinal(p.a)}
           <CopyButton a={p.a.text} b={p.b.text} />
         </div>
         <Context around={a}>
@@ -170,7 +195,7 @@ function PassagePair({
       </div>
       <div className="pane">
         <div className="k">
-          <b>B</b> {ordinal(p.b)}
+          <b>B</b> {fileB(p.b.start)} · {chapterLabel(p.b.chapter)} · {ordinal(p.b)}
         </div>
         <Context around={b}>
           <Marked diff={diff} side="b" />

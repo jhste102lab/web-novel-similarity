@@ -42,11 +42,13 @@ out when the next one starts.
 
 ## Consequences
 
-- No preview: 내보내기 builds the file directly and shows `n / N쪽` progress
-  with 취소.
+- 내보내기 shows `n / N쪽` progress with 취소, then the finished file in the
+  browser's own PDF viewer; `PDF로 저장` asks before downloading (owner
+  feedback, 2026-09-30 #4). The preview is the file itself, so it cannot
+  differ from what is saved.
 - Every browser gets the same pages. Text stays selectable and searchable.
 - Opening an export costs a 2.7 MB font fetch (then cached) and a 0.5 MB worker.
 - The synthetic worst case (168,083 chapter pairs, `docs/benchmark.md`) gives
-  51,311 pages; see the benchmark for time and size.
+  83,831 pages; see the benchmark for time and size.
 - Marks use one colour for text both sides share; the report has no summary
   table any more (a finding list is the report).

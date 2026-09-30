@@ -10,8 +10,10 @@ export interface Around {
 // Sentence pieces as the engine ends them (., !, ? plus closing quotes, or a line break),
 // but keeping short sentences ("응.") that the index skips.
 const PIECE = /[^.!?\n]*(?:[.!?]+[”’"'」』)\]]*|\n+|$)/gu
-/** How far to look for a neighbour; a longer neighbour shows only its nearer part. */
-const REACH = 400
+/** Neighbour sentences shown on each side. */
+const SENTENCES = 2
+/** How far to look for neighbours; a longer neighbour shows only its nearer part. */
+const REACH = 500
 
 function pieces(t: string): string[] {
   return (t.match(PIECE) ?? []).map((p) => p.trim()).filter((p) => p !== '')
@@ -36,9 +38,13 @@ export function aroundOf(m: ManuscriptText): (start: number, end: number) => Aro
   return (start, end) => {
     const [from, to] = segment(start)
     return {
-      before: pieces(m.text.slice(Math.max(from, start - REACH), start)).at(-1) ?? '',
+      before: pieces(m.text.slice(Math.max(from, start - REACH), start))
+        .slice(-SENTENCES)
+        .join(' '),
       text: m.text.slice(start, end).trim(),
-      after: pieces(m.text.slice(end, Math.min(to, end + REACH)))[0] ?? '',
+      after: pieces(m.text.slice(end, Math.min(to, end + REACH)))
+        .slice(0, SENTENCES)
+        .join(' '),
     }
   }
 }

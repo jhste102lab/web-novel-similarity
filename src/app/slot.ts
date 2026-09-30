@@ -1,5 +1,6 @@
 import {
   buildManuscript,
+  engineOrder,
   toEngineText,
   type Manuscript,
   type ParsedFile,
@@ -78,6 +79,26 @@ export function slotEngineText(slot: Slot): ManuscriptText {
     ...slot.manuscript,
     parts: slot.manuscript.parts.map((p, i) => ({ ...p, label: slot.labels[i] ?? null })),
   })
+}
+
+/** The file an offset of `slotEngineText(slot)` came from, for the report. */
+export function slotFileAt(slot: Slot): (pos: number) => string {
+  const parts = engineOrder(
+    slot.manuscript.parts.map((p, i) => ({ ...p, label: slot.labels[i] ?? null })),
+  )
+  const ends: number[] = []
+  let end = 0
+  for (const p of parts) ends.push((end += p.text.length + 2)) // toEngineText joins with '\n\n'
+  return (pos) => {
+    let lo = 0
+    let hi = ends.length - 1
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (ends[mid]! <= pos) lo = mid + 1
+      else hi = mid
+    }
+    return parts[lo]?.file ?? ''
+  }
 }
 
 function totalChars(slot: Slot): number {

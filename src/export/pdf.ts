@@ -9,16 +9,15 @@ export interface PdfManuscript {
   title: string
   files: string[]
 }
-/** One side of a finding: "12화 · 3번째 문장" and the text with its neighbours. */
+/** One side of a finding: "원본.txt · 12화 · 3번째 문장" and the text with its neighbours. */
 export interface PdfSide extends Around {
   label: string
 }
 export interface PdfMatch {
-  /** "A 12화 ↔ B 15화" */
-  title: string
+  /** "원본.txt · 12화", one per side. */
+  a: string
+  b: string
   tier: Tier
-  /** "거의 동일 · 유사 문장 12개 · 구간 3개" */
-  note: string
   passages: { a: PdfSide; b: PdfSide }[]
 }
 export interface PdfGroup {
@@ -58,10 +57,18 @@ const BOTTOM = PAGE_H - 52
 const GAP = 16
 const COL = (WIDTH - GAP) / 2
 const PLACE_W = 92
+/** Label column of the first-page table. */
+const LABEL_W = 92
+/** Inner padding of a passage column. */
+const PAD = 8
+/** Chip and label row on top of a passage column. */
+const HEAD = 20
 
 const BODY = 9
 const LINE = 14.5
 const SMALL = 7.5
+/** Baseline of text in a LINE-high row, from the row top. */
+const BASE = 10.5
 
 const INK = '#1f2430'
 const META = '#6a7182'
@@ -70,6 +77,13 @@ const RULE = '#dfe2e9'
 const BAND = '#eef0f4'
 const MARK = '#fbe7b5'
 const TIER: Record<Tier, string> = { near: '#c42b1f', edited: '#a86a00' }
+const TIER_NAME: Record<Tier, string> = { near: '거의 동일', edited: '일부 수정' }
+/** Each manuscript has its own colour: its chip and labels, and a tint behind its column. */
+const SIDE = {
+  A: { ink: '#2356c4', bg: '#f1f5fd' },
+  B: { ink: '#1b7a50', bg: '#eff7f2' },
+} as const
+type Key = keyof typeof SIDE
 
 type Style = 'ctx' | 'own' | 'eq'
 interface Run {
@@ -230,30 +244,61 @@ class Layout {
     }
   }
 
-  /** Label on the left, wrapped value on the right (first page). */
-  fact(label: string, value: string): void {
-    const lines = this.wrap([{ text: value, style: 'own' }], WIDTH - 80, BODY)
-    for (const [i, l] of lines.entries()) {
-      this.need(LINE)
-      this.y += LINE
-      if (i === 0) this.c?.text(label, LEFT, this.y, 8.5, META)
-      this.drawLine(l, LEFT + 80, this.y, BODY)
+  /** Label/value rows between rules on the first page; a manuscript's rows get its tint. */
+  facts(rows: [string, string][], side: Key | null): void {
+    const fill = (h: number): void => {
+      if (side) this.c?.rect(LEFT, this.y, WIDTH, h, SIDE[side].bg)
+      this.y += h
     }
+    fill(7)
+    for (const [label, value] of rows) {
+      const lines = this.wrap([{ text: value, style: 'own' }], WIDTH - LABEL_W - 10, BODY)
+      for (const [i, line] of lines.entries()) {
+        this.need(LINE)
+        const top = this.y
+        fill(LINE)
+        if (i === 0) this.c?.text(label, LEFT + 10, top + BASE, 8.5, side ? SIDE[side].ink : META)
+        this.drawLine(line, LEFT + LABEL_W, top + BASE, BODY)
+      }
+    }
+    fill(7)
   }
 
-  /** Grey band with a tier dot, a title and a note on the right. */
-  band(title: string, note: string, tier: Tier | null): void {
+  hrule(h: number, color: string): void {
+    this.c?.rect(LEFT, this.y, WIDTH, h, color)
+    this.y += h
+  }
+
+  /** Square chip with the manuscript letter. */
+  chip(key: Key, x: number, y: number): void {
+    this.c?.rect(x, y, 13, 13, SIDE[key].ink)
+    this.c?.text(key, x + (13 - this.width(key, 8.5)) / 2, y + 9.8, 8.5, '#ffffff')
+  }
+
+  /**
+   * Grey band over a finding. A comparison band puts each side over its column in its colour
+   * ("A 원본.txt · 12화"); a repeat band has one title.
+   */
+  band(left: string, right: string | null, tier: Tier | null, cont: boolean): void {
     const h = 24
     const c = this.c
     if (c) {
       c.rect(LEFT, this.y, WIDTH, h, BAND)
       if (tier) c.circle(LEFT + 11, this.y + h / 2, 3, TIER[tier])
-      const tx = LEFT + (tier ? 20 : 10)
-      const noteW = this.width(note, 8)
-      c.text(this.fit(title, WIDTH - noteW - 40, 10), tx, this.y + 16, 10, INK)
-      c.text(note, RIGHT - 10 - noteW, this.y + 15.5, 8, META)
+      const y = this.y + 16
+      const more = cont ? '(계속)' : ''
+      const moreW = this.width(more, 8)
+      if (more) c.text(more, RIGHT - 10 - moreW, y - 0.5, 8, META)
+      if (right === null) {
+        c.text(this.fit(left, WIDTH - moreW - 40, 10), LEFT + 10, y, 10, INK)
+      } else {
+        const bx = LEFT + COL + GAP
+        c.text(this.fit(left, COL - 24, 10), LEFT + 20, y, 10, SIDE.A.ink)
+        c.text('↔', bx - GAP / 2 - this.width('↔', 10) / 2, y, 10, META)
+        c.text(this.fit(right, COL - moreW - 20, 10), bx, y, 10, SIDE.B.ink)
+      }
     }
-    this.y += h + 4
+    this.y += h + 6
   }
 
   rule(): void {
@@ -278,72 +323,117 @@ function diffRuns(a: string, b: string, side: 'a' | 'b'): Run[] {
 }
 
 function cover(l: Layout, input: PdfInput): void {
-  l.need(40)
-  l.y += 22
-  l.c?.text(input.heading, LEFT, l.y, 18, INK)
-  l.y += 14
-  l.fact('검사일', input.date)
+  l.need(60)
+  l.y += 26
+  l.c?.text(input.heading, LEFT, l.y, 20, INK)
+  l.y += 16
+  l.hrule(1.2, INK)
+  l.facts([['검사일', input.date]], null)
   for (const m of input.manuscripts) {
-    l.fact(`원고 ${m.key}`, m.title)
-    l.fact(`${m.key} 파일 ${m.files.length.toLocaleString()}개`, m.files.join(', '))
+    l.hrule(0.5, RULE)
+    l.facts(
+      [
+        [`원고 ${m.key}`, m.title],
+        [`${m.key} 파일 ${m.files.length.toLocaleString()}개`, m.files.join(', ')],
+      ],
+      m.key,
+    )
   }
-  for (const [k, v] of input.facts) l.fact(k, v)
+  l.hrule(0.5, RULE)
+  l.facts(input.facts, null)
+  l.hrule(1.2, INK)
   // Legend: what the colours mean.
   l.need(LINE * 2)
   l.y += LINE * 1.6
   const c = l.c
-  const legend = [
-    ['겹치는 부분', 'eq'],
-    ['앞뒤 문장', 'ctx'],
-  ] as const
   let x = LEFT
-  for (const [text, style] of legend) {
-    const w = l.width(text, 8.5)
-    if (style === 'eq') c?.rect(x - 3, l.y - 9, w + 6, 12.5, MARK)
-    c?.text(text, x, l.y, 8.5, style === 'eq' ? INK : CTX)
-    x += w + 24
+  const item = (text: string, color: string, w: number): void => {
+    c?.text(text, x, l.y, 8.5, color)
+    x += w + 22
+  }
+  const eq = l.width('겹치는 부분', 8.5)
+  c?.rect(x - 3, l.y - 9, eq + 6, 12.5, MARK)
+  item('겹치는 부분', INK, eq)
+  item('앞뒤 문장', CTX, l.width('앞뒤 문장', 8.5))
+  if (input.kind === 'compare') {
+    for (const t of ['near', 'edited'] as const) {
+      c?.circle(x + 3, l.y - 3, 3, TIER[t])
+      x += 10
+      item(TIER_NAME[t], INK, l.width(TIER_NAME[t], 8.5))
+    }
   }
   l.y += 20
 }
 
+/** Two tinted columns of a passage; split over pages, the chip and label row only on top. */
+function passage(
+  l: Layout,
+  p: { a: PdfSide; b: PdfSide },
+  a: Line[],
+  b: Line[],
+  again: () => void,
+): void {
+  const rows = Math.max(a.length, b.length)
+  let i = 0
+  while (i < rows) {
+    const head = i === 0 ? HEAD : 0
+    if (l.need(PAD * 2 + head + LINE)) again()
+    const n = Math.min(rows - i, Math.floor((BOTTOM - l.y - PAD * 2 - head) / LINE))
+    const h = PAD * 2 + head + n * LINE
+    const top = l.y
+    for (const [key, x, side, lines] of [
+      ['A', LEFT, p.a, a],
+      ['B', LEFT + COL + GAP, p.b, b],
+    ] as const) {
+      l.c?.rect(x, top, COL, h, SIDE[key].bg)
+      if (head) {
+        l.chip(key, x + PAD, top + PAD)
+        l.c?.text(
+          l.fit(side.label, COL - PAD * 2 - 18, SMALL),
+          x + PAD + 18,
+          top + PAD + 9.5,
+          SMALL,
+          SIDE[key].ink,
+        )
+      }
+      for (let k = 0; k < n; k++) {
+        const line = lines[i + k]
+        if (line) l.drawLine(line, x + PAD, top + PAD + head + k * LINE + BASE, BODY)
+      }
+    }
+    l.y += h
+    i += n
+  }
+}
+
 async function compareBody(l: Layout, rows: PdfMatch[]): Promise<void> {
   for (const m of rows) {
-    l.need(24 + 4 + 14 + LINE * 2)
-    l.band(m.title, m.note, m.tier)
+    const again = (): void => l.band(`A ${m.a}`, `B ${m.b}`, m.tier, true)
+    l.need(30 + PAD * 2 + HEAD + LINE * 2)
+    l.band(`A ${m.a}`, `B ${m.b}`, m.tier, false)
     for (const p of m.passages) {
       await l.breathe()
-      const a = l.wrap(runs(p.a, diffRuns(p.a.text, p.b.text, 'a')), COL, BODY)
-      const b = l.wrap(runs(p.b, diffRuns(p.a.text, p.b.text, 'b')), COL, BODY)
-      if (l.need(14 + LINE * 2)) l.band(`${m.title} (계속)`, m.note, m.tier)
-      l.y += 10
-      l.c?.text(l.fit(`A · ${p.a.label}`, COL, SMALL), LEFT, l.y, SMALL, META)
-      l.c?.text(l.fit(`B · ${p.b.label}`, COL, SMALL), LEFT + COL + GAP, l.y, SMALL, META)
-      l.y += 2
-      for (let i = 0; i < Math.max(a.length, b.length); i++) {
-        if (l.need(LINE)) l.band(`${m.title} (계속)`, m.note, m.tier)
-        l.y += LINE
-        if (a[i]) l.drawLine(a[i]!, LEFT, l.y, BODY)
-        if (b[i]) l.drawLine(b[i]!, LEFT + COL + GAP, l.y, BODY)
-      }
-      l.y += 8
-      l.rule()
+      const a = l.wrap(runs(p.a, diffRuns(p.a.text, p.b.text, 'a')), COL - PAD * 2, BODY)
+      const b = l.wrap(runs(p.b, diffRuns(p.a.text, p.b.text, 'b')), COL - PAD * 2, BODY)
+      passage(l, p, a, b, again)
+      l.y += 6
     }
-    l.y += 14
+    l.y += 12
   }
 }
 
 async function repeatBody(l: Layout, rows: PdfGroup[]): Promise<void> {
   for (const g of rows) {
-    l.need(24 + 4 + LINE * 2)
-    l.band(g.title, '', null)
+    l.need(30 + LINE * 2)
+    l.band(g.title, null, null, false)
     for (const p of g.places) {
       await l.breathe()
       const lines = l.wrap(runs(p, [{ text: p.text, style: 'eq' }]), WIDTH - PLACE_W, BODY)
       const label = l.wrap([{ text: p.label, style: 'own' }], PLACE_W - 10, 8)
-      if (l.need(LINE * 2)) l.band(`${g.title} (계속)`, '', null)
+      if (l.need(LINE * 2)) l.band(g.title, null, null, true)
       l.y += 4
       for (let i = 0; i < Math.max(lines.length, label.length); i++) {
-        if (l.need(LINE)) l.band(`${g.title} (계속)`, '', null)
+        if (l.need(LINE)) l.band(g.title, null, null, true)
         l.y += LINE
         if (label[i]) for (const s of label[i]!) l.c?.text(s.text, LEFT + s.x, l.y, 8, META)
         if (lines[i]) l.drawLine(lines[i]!, LEFT + PLACE_W, l.y, BODY)
