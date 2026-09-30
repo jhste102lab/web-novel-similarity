@@ -102,9 +102,10 @@ Caps added because of this run:
   stacked beside A) gave 7,949 → 4,372 → 5,746 → 6,454 → 7,067 pages and
   1,510 → 943 → 1,142 → 1,164 → 1,022 pages.
 - `MAX_PASSAGES_PER_MATCH = 20` passages per chapter pair, strongest first, with
-  `유사 문장 26개 · 상위 20개 표시` in the detail header.
-- The 내부 반복 detail pane lists at most 100 occurrences of a group (`외 882곳`
-  for the rest); one synthetic group occurred 982 times.
+  `유사 문장 N개 · 구간 M개 (상위 20개 표시)` in the detail header when capped.
+- The 내부 반복 detail pane initially lists at most 100 occurrences of a group;
+  `외 N곳 더 보기` expands the rest. One synthetic group occurred 982 times
+  (`외 882곳 더 보기`).
 
 Historically, also verified in that session: 중단 mid-run returned to the start
 screen with both slots still loaded, `새로 비교` asked before discarding results,

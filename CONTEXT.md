@@ -68,7 +68,9 @@ Product (2026-09-21, design accepted):
 - Export: 내보내기 opens a preview of the report's first 30 pages in the
   browser's PDF viewer, with the total page count. `PDF로 저장` asks
   `PDF로 저장할까요?`, then builds the whole report (the active tab's findings,
-  in the list's current sort order; search ignored) and downloads it.
+  in the list's current sort order; search ignored) and downloads it as
+  `작품명_유사도검사_YYYYMMDD_HHMMSS.pdf`: A's trimmed title (`원고` if blank)
+  and the local date/time when `PDF로 저장` was clicked.
 - Privacy is shown, not explained: one line under the title
   (`업로드된 파일은 외부 서버로 전송되지 않으며, 사용자의 브라우저 내에서만 처리됩니다.`).
 - Persistence: memory only. Refresh discards results. No JSON save/reopen.
@@ -117,10 +119,11 @@ Review (2026-09-30 #2, shared-text marks; updated after real-result feedback):
 - Result order defaults to 회차순; the list's sort bar also offers 유사도순
   for comparison and 반복 많은 순 for repeats. The PDF follows this order.
 - Marks show what the two sides **share**, in the detail pane and the PDF
-  (earlier: what differed). Comparison passages and repeat places show two
-  neighbouring sentences a side on screen and in the PDF, dimmed and never
-  marked.
-- Export is a PDF of every finding, independent of tab and search. No export
+  (earlier: what differed). Comparison passages and repeat places originally
+  showed two neighbouring sentences a side; Review #4 increased this to four,
+  dimmed and never marked.
+- Export originally included every finding, independent of tab and search;
+  Review #4 changed it to the active tab, still ignoring search. No export
   scope or amount options, image export or row selection remains.
 - Every chapter pair and repeat group is kept; there is no result cap.
   The strongest 20 passages per chapter pair are still retained.
@@ -133,7 +136,8 @@ Review (2026-09-30 #3, owner feedback on real results):
 - Chapter order should be the default, so results can be read front to back.
 - Show the surrounding sentences to make a finding's context visible.
 - Long downloads must complete reliably, not clip or stop partway through.
-- Export scope is always every finding, regardless of tab or search.
+- Export scope was every finding, regardless of tab or search (superseded by
+  Review #4's active-tab export).
 - Use a PDF library only, with reports beyond 3,000 pages supported (ADR 0007).
 - Remove the export-scope control.
 - Remove the export-amount control.

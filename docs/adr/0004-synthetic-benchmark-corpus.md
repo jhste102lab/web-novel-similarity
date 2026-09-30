@@ -20,8 +20,8 @@ only synthetic data; or use public-domain Korean text.
   synonym swaps, particle changes, clause insertion/deletion, reordering,
   and unrelated pairs. Labels are the applied edit class, so the corpus is
   deterministic and reproducible from a seed.
-- Thresholds live in one constants file in the engine and are changed only
-  together with the benchmark report.
+- Thresholds live in `src/shared/constants.ts` and are changed only together
+  with the benchmark report.
 
 - Real manuscripts MAY be used only for local validation of false-positive
   rates. Their text, title, filename, path, hash, fingerprints, diffs, and

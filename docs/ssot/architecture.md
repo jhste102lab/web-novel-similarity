@@ -9,11 +9,12 @@ commit.
 ```
 browser tab
  ├─ app (React, main thread)   drop files → parse → chapter table → postMessage
- └─ worker (Web Worker)        index → retrieve candidates → compare → chain → tier → postMessage
+ ├─ worker (Web Worker)        index → retrieve candidates → compare → chain → tier → postMessage
+ └─ PDF worker (Web Worker)    count pages → draw preview or full PDF → postMessage
 ```
 
-No network requests after the page loads, except the lazily loaded chunks of
-this site. Parsing happens on the main thread (HWPX needs `DOMParser`;
+No network requests after the page loads, except this site's own chunks,
+WASM and report font. Parsing happens on the main thread (HWPX needs `DOMParser`;
 `mammoth` and rhwp are loaded on demand); only the extracted text goes to the
 worker. The build adds a Content-Security-Policy meta tag (`vite.config.ts`,
 build only): scripts, styles, fonts, workers and `fetch` are limited to this
@@ -102,6 +103,12 @@ export type WorkerResponse =
 
 The engine is synchronous; 중단 terminates the worker (`client.ts`), so there
 is no abort message and no cancellation checks inside the hot loops.
+
+The separate PDF worker protocol lives in `src/export/pdf.worker.ts`:
+`PdfRequest` carries `{ input: PdfInput, font: string, limit?: number }`;
+`PdfResponse` is `progress { page, pages }`, `done { blob, pages }` or
+`error { message }`. `pages` is always the whole report's count, including
+for a limited preview. Cancellation terminates this worker too.
 
 ## Result types
 
@@ -212,7 +219,7 @@ setting. The report holds the **active tab's findings** (search ignored; the
 first page's `담은 결과` names the tab), in the list's current sort order. The per-chapter-pair passage limit still applies;
 repeats include every place.
 
-- **Client** — `src/export/exportPdf.ts` starts a fresh worker per build and returns `{ blob, pages }`. `PDF로 저장` asks `PDF로 저장할까요?` (예/아니오); then the whole report is built with `PDF 만드는 중 n / N쪽`, a bar and 취소 in the overlay header, downloaded, and the overlay closes. A report of 30 pages or fewer saves the preview file itself. Closing or cancelling terminates the worker; a failure is shown in the overlay body. The download name is `유사도 검사 2026. 9. 30.pdf` for that date.
+- **Client** — `src/export/exportPdf.ts` starts a fresh worker per build and returns `{ blob, pages }`. `PDF로 저장` asks `PDF로 저장할까요?` (예/아니오) with the file name and page count; then the whole report is built with `PDF 만드는 중 n / N쪽`, a bar and 취소 in the overlay header, downloaded, and the overlay closes. A report of 30 pages or fewer saves the preview file itself. Closing or cancelling terminates the worker; a failure is shown in the overlay body. The download name is A's title (`원고` when blank), `유사도검사` and the local time 저장 was asked: `검은달_유사도검사_20260930_171530.pdf`.
 - **Worker** — `src/export/pdf.worker.ts` uses PDFKit 0.20's browser build and `Pretendard-Regular.ttf` from `pretendard/dist/public/static/alternative/`, subset-embedded. Text stays selectable. PDFKit emits completed pages; the layout yields every ten pages to let its output queue drain.
 - **Layout** — `src/export/pdf.ts` is DOM-free and runs twice: count pages without drawing, then draw with a known total; `renderPdf(…, limit)` stops the drawing pass after `limit` pages for the preview, whose footers still show the full total. Every page has a file-name running header (`A 원본.txt ↔ B 편집본.txt`; many files use `first 외 N개`), an `n / N` footer on the left and the date on the right.
 - **First page** — `유사도 검사 결과` / `내부 반복 검사 결과`, then a ruled table: 검사일; 원고 A title and chapter extent with the full file-name list (`A 파일 N개`, naturally sorted in `Slot.files`) on A's tint; the same for B on B's tint; result counts, 정렬, and 참고 when stopped. The legend explains 겹치는 부분, 앞뒤 문장 and the tier dots.

@@ -245,12 +245,12 @@ export function App() {
     if (pdf?.shown) URL.revokeObjectURL(pdf.shown.url)
     setPdf(null)
   }
-  // "2026. 9. 30." ends in a dot; the name would read "30..pdf".
-  const pdfName = `유사도 검사 ${today().slice(0, -1)}.pdf`
   const savePdf = (): void => {
     const job = pdf
-    if (!job?.shown) return
+    if (!job?.shown || !results) return
     const { pdf: shown, url } = job.shown
+    // 작품명_유사도검사_20260930_171530.pdf, named after A and the moment 저장 was asked.
+    const pdfName = `${results.a.title.trim() || '원고'}_유사도검사_${stamp()}.pdf`
     confirm('PDF로 저장할까요?', `${pdfName} · ${shown.pages.toLocaleString()}쪽`, () => {
       const finish = (blob: Blob): void => {
         download(blob, pdfName)
@@ -559,6 +559,13 @@ function pdfInput(
 function today(): string {
   const d = new Date()
   return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`
+}
+
+/** "20260930_171530", local time. */
+function stamp(): string {
+  const d = new Date()
+  const two = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`
 }
 
 function GithubIcon() {

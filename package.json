@@ -1,7 +1,7 @@
 {
   "name": "web-novel-similarity",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Browser-only similarity checker for Korean web-novel manuscripts: finds copied or lightly edited sentences between two works, or repeats inside one.",
   "homepage": "https://jhste102lab.github.io/web-novel-similarity/",
   "repository": {
