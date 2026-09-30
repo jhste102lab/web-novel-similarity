@@ -1,11 +1,83 @@
 import type { DiffOp } from '../shared/types.ts'
 
+/** Above this many LCS cells (a.length × b.length) the diff anchors on whole sentences first. */
+const MAX_CELLS = 250_000
+// A sentence piece ends after ., !, ? (plus closing quotes and following spaces) or a line break.
+const PIECE = /[^.!?\n]*(?:[.!?]+[”’"'」』)\]]*\s*|\n+|$)/gu
+
 /**
- * Character diff by LCS dynamic programming. Passage texts are a few hundred
- * characters and diffs are computed lazily for the opened result only, so the
- * O(n·m) table is acceptable.
+ * Character diff by LCS dynamic programming. A whole copied chapter is far beyond what an
+ * O(n·m) table allows, so long texts are first matched sentence by sentence and only the
+ * unmatched stretches between equal sentences are diffed by character.
  */
 export function charDiff(a: string, b: string): DiffOp[] {
+  return a.length * b.length <= MAX_CELLS ? lcsDiff(a, b) : anchoredDiff(a, b)
+}
+
+function anchoredDiff(a: string, b: string): DiffOp[] {
+  const pa = pieces(a)
+  const pb = pieces(b)
+  const w = pb.length + 1
+  const lcs = new Uint32Array((pa.length + 1) * w)
+  for (let i = pa.length - 1; i >= 0; i--)
+    for (let j = pb.length - 1; j >= 0; j--)
+      lcs[i * w + j] =
+        pa[i] === pb[j]
+          ? lcs[(i + 1) * w + j + 1]! + 1
+          : Math.max(lcs[(i + 1) * w + j]!, lcs[i * w + j + 1]!)
+  const out: DiffOp[] = []
+  const push = (op: DiffOp): void => {
+    const last = out[out.length - 1]
+    if (last && last.op === op.op) last.text += op.text
+    else if (op.text) out.push({ ...op })
+  }
+  let gapA = ''
+  let gapB = ''
+  const flush = (): void => {
+    // A stretch without sentence ends can still be too long for the table; its shared start
+    // and end are kept, and only what lies between is given up as one change.
+    let p = 0
+    while (p < gapA.length && p < gapB.length && gapA[p] === gapB[p]) p++
+    let q = 0
+    while (
+      q < gapA.length - p &&
+      q < gapB.length - p &&
+      gapA[gapA.length - 1 - q] === gapB[gapB.length - 1 - q]
+    )
+      q++
+    const midA = gapA.slice(p, gapA.length - q)
+    const midB = gapB.slice(p, gapB.length - q)
+    push({ op: 'eq', text: gapA.slice(0, p) })
+    if (midA.length * midB.length <= MAX_CELLS) lcsDiff(midA, midB).forEach(push)
+    else {
+      push({ op: 'del', text: midA })
+      push({ op: 'ins', text: midB })
+    }
+    push({ op: 'eq', text: gapA.slice(gapA.length - q) })
+    gapA = ''
+    gapB = ''
+  }
+  let i = 0
+  let j = 0
+  while (i < pa.length || j < pb.length) {
+    if (i < pa.length && j < pb.length && pa[i] === pb[j]) {
+      flush()
+      push({ op: 'eq', text: pa[i]! })
+      i++
+      j++
+    } else if (j >= pb.length || (i < pa.length && lcs[(i + 1) * w + j]! >= lcs[i * w + j + 1]!))
+      gapA += pa[i++]
+    else gapB += pb[j++]
+  }
+  flush()
+  return out
+}
+
+function pieces(t: string): string[] {
+  return t.match(PIECE)!.filter((p) => p !== '')
+}
+
+function lcsDiff(a: string, b: string): DiffOp[] {
   const n = a.length
   const m = b.length
   const w = m + 1

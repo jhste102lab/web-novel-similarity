@@ -2,9 +2,17 @@ import { useMemo, useState } from 'react'
 import type { RepeatGroup, RepeatResult } from '../shared/types.ts'
 import { CopyButton } from './CopyButton.tsx'
 import { ResultsShell, Tab, type ViewProps } from './ResultsShell.tsx'
-import { cappedNote, filterGroups, where, type RepeatFilter } from './results.ts'
+import {
+  cappedNote,
+  filterGroups,
+  groupKey,
+  groupSpan,
+  searchGroups,
+  where,
+  type RepeatFilter,
+} from './results.ts'
 
-/** A repeat group can occur hundreds of times; the detail pane lists only the first ones. */
+/** A repeat group can occur hundreds of times; the detail pane lists the first ones until asked. */
 const MAX_OCCURRENCES = 100
 
 /** Repeats inside one manuscript: one row per recurring sentence, the detail pane lists where. */
@@ -13,19 +21,20 @@ export function RepeatView({
   titleA,
   filter,
   onFilter,
+  query,
+  onQuery,
   selected,
   onSelect,
+  picked,
+  onPick,
   running,
   stopped,
 }: ViewProps<RepeatResult, RepeatFilter>) {
-  const [query, setQuery] = useState('')
   const rows = useMemo(
     () => searchGroups(filterGroups(result.groups, filter), query),
     [result, filter, query],
   )
   const count = (f: RepeatFilter): number => filterGroups(result.groups, f).length
-  const span = (q: RepeatGroup): string =>
-    `${where(q.occurrences[0]!)}~${where(q.occurrences[q.occurrences.length - 1]!)}`
   return (
     <ResultsShell
       title={
@@ -44,8 +53,11 @@ export function RepeatView({
       rows={rows}
       selected={selected}
       onSelect={onSelect}
+      picked={picked}
+      onPick={onPick}
+      keyOf={groupKey}
       query={query}
-      onQuery={setQuery}
+      onQuery={onQuery}
       emptyText={query ? '찾는 조건에 맞는 결과가 없습니다.' : '의심되는 반복 문장이 없습니다.'}
       capped={cappedNote(result.groups.length, result.total)}
       running={running}
@@ -58,40 +70,41 @@ export function RepeatView({
           <div className="b">
             <div className="pos">
               <span style={{ color: 'inherit', margin: 0 }}>{q.occurrences.length}회</span>
-              <span>{span(q)}</span>
+              <span>{groupSpan(q)}</span>
             </div>
             <div className="ex">{q.text}</div>
           </div>
         </>
       )}
-      renderDetail={(g) => (
-        <>
-          <div className="head">
-            <span className="pct">{g.occurrences.length}회</span>
-            <CopyButton a={g.text} />
-            <span className="where">{span(g)}</span>
-          </div>
-          {g.occurrences.slice(0, MAX_OCCURRENCES).map((o, i) => (
-            <div key={i} className="occ">
-              <span className="ch">{where(o)}</span>
-              <span>{g.text}</span>
-            </div>
-          ))}
-          {g.occurrences.length > MAX_OCCURRENCES && (
-            <div className="occ">
-              <span className="ch">…</span>
-              <span>외 {(g.occurrences.length - MAX_OCCURRENCES).toLocaleString()}곳</span>
-            </div>
-          )}
-        </>
-      )}
+      renderDetail={(g) => <GroupDetail g={g} />}
     />
   )
 }
 
-/** Repeat groups whose text or chapter labels contain the query. */
-function searchGroups(groups: RepeatGroup[], query: string): RepeatGroup[] {
-  const q = query.trim()
-  if (q === '') return groups
-  return groups.filter((g) => g.text.includes(q) || g.occurrences.some((o) => where(o).includes(q)))
+function GroupDetail({ g }: { g: RepeatGroup }) {
+  // The pane remounts per row, so every group opens collapsed.
+  const [all, setAll] = useState(false)
+  const shown = all ? g.occurrences : g.occurrences.slice(0, MAX_OCCURRENCES)
+  const rest = g.occurrences.length - shown.length
+  return (
+    <>
+      <div className="head">
+        <span className="pct">{g.occurrences.length}회</span>
+        <CopyButton a={g.text} />
+        <span className="where">{groupSpan(g)}</span>
+      </div>
+      {shown.map((o, i) => (
+        <div key={i} className="occ">
+          <span className="ch">{where(o)}</span>
+          <span>{g.text}</span>
+        </div>
+      ))}
+      {rest > 0 && (
+        <button className="occ more" onClick={() => setAll(true)}>
+          <span className="ch">…</span>
+          <span>외 {rest.toLocaleString()}곳 더 보기</span>
+        </button>
+      )}
+    </>
+  )
 }

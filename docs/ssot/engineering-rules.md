@@ -51,14 +51,14 @@ bench/         synthetic corpus generator and threshold report (Node scripts).
 
 Add a dependency only when it replaces a meaningful amount of non-trivial code. Record it here.
 
-| Package          | Why                                 | Replacement considered                                   |
-| ---------------- | ----------------------------------- | -------------------------------------------------------- |
-| react, react-dom | UI (ADR 0003)                       | —                                                        |
-| mammoth          | `.docx` text extraction             | own OOXML reader (more code, less tested)                |
-| fflate           | unzip `.hwpx`                       | `DecompressionStream` (no ZIP central directory support) |
-| @rhwp/core       | `.hwp` (HWP 5) text, pinned exactly | own CFB/record reader; hwp.js (unmaintained) — ADR 0005  |
-| html2canvas-pro  | PNG export (PDF uses browser print) | jspdf (blank pages past the canvas height limit)         |
-| pretendard       | UI font                             | —                                                        |
+| Package          | Why                                  | Replacement considered                                   |
+| ---------------- | ------------------------------------ | -------------------------------------------------------- |
+| react, react-dom | UI (ADR 0003)                        | —                                                        |
+| mammoth          | `.docx` text extraction              | own OOXML reader (more code, less tested)                |
+| fflate           | unzip `.hwpx`; zip PNG export pieces | `DecompressionStream` (no ZIP central directory support) |
+| @rhwp/core       | `.hwp` (HWP 5) text, pinned exactly  | own CFB/record reader; hwp.js (unmaintained) — ADR 0005  |
+| html2canvas-pro  | PNG export (PDF uses browser print)  | jspdf (blank pages past the canvas height limit)         |
+| pretendard       | UI font                              | —                                                        |
 
 Anything not listed here is not approved yet.
 

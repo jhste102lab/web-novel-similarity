@@ -9,8 +9,13 @@ export interface ViewProps<R, F> {
   titleA: string
   filter: F
   onFilter: (f: F) => void
+  query: string
+  onQuery: (q: string) => void
   selected: number
   onSelect: (i: number) => void
+  /** Keys of the rows ticked for export. */
+  picked: ReadonlySet<string>
+  onPick: (next: Set<string>) => void
   /** Findings are still streaming in from the worker. */
   running: boolean
   /** The user stopped the run, so the findings cover only part of the manuscript. */
@@ -60,6 +65,9 @@ interface ShellProps<T> {
   rows: T[]
   selected: number
   onSelect: (i: number) => void
+  picked: ReadonlySet<string>
+  onPick: (next: Set<string>) => void
+  keyOf: (row: T) => string
   renderRow: (row: T) => React.ReactNode
   renderDetail: (row: T) => React.ReactNode
   /** Text `c` copies for the selected row. */
@@ -109,6 +117,34 @@ export function ResultsShell<T>(p: ShellProps<T>) {
     measure()
   }, [p.selected, p.rows.length, measure])
 
+  // Shift+click ticks every row between the last clicked one and this one.
+  const anchor = useRef<number | null>(null)
+  useEffect(() => {
+    anchor.current = null
+  }, [p.rows])
+  const isPicked = (i: number): boolean => p.picked.has(p.keyOf(p.rows[i]!))
+  const pick = (from: number, to: number, on: boolean): void => {
+    const next = new Set(p.picked)
+    for (let i = Math.min(from, to); i <= Math.max(from, to); i++) {
+      const k = p.keyOf(p.rows[i]!)
+      if (on) next.add(k)
+      else next.delete(k)
+    }
+    p.onPick(next)
+  }
+  const onItem = (i: number, e: React.MouseEvent): void => {
+    const box = (e.target as HTMLElement).classList.contains('ck')
+    if (e.shiftKey && anchor.current !== null) pick(anchor.current, i, box ? !isPicked(i) : true)
+    else if (box) pick(i, i, !isPicked(i))
+    anchor.current = i
+    p.onSelect(i)
+  }
+  const pickedHere = p.rows.reduce((n, r) => n + (p.picked.has(p.keyOf(r)) ? 1 : 0), 0)
+  const allBox = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (allBox.current) allBox.current.indeterminate = pickedHere > 0 && pickedHere < p.rows.length
+  })
+
   const flash = (text: string): void => {
     setToast(text)
     setTimeout(() => setToast(null), 1600)
@@ -141,6 +177,12 @@ export function ResultsShell<T>(p: ShellProps<T>) {
       if (!row) return
       void copyText(p.copyOf(row)).then(() => flash('문장을 복사했어요'))
       return
+    }
+    if (key === 'x') {
+      const i = row ? p.rows.indexOf(row) : -1
+      if (i < 0) return
+      anchor.current = i
+      return pick(i, i, !isPicked(i))
     }
     const step = key === 'j' || key === 'ArrowDown' ? 1 : key === 'k' || key === 'ArrowUp' ? -1 : 0
     if (step !== 0) {
@@ -177,6 +219,25 @@ export function ResultsShell<T>(p: ShellProps<T>) {
         ) : (
           <>
             <div className="col">
+              <div className="selbar">
+                <label>
+                  <input
+                    type="checkbox"
+                    ref={allBox}
+                    checked={pickedHere === p.rows.length}
+                    onChange={(e) => pick(0, p.rows.length - 1, e.target.checked)}
+                  />
+                  전체 선택
+                </label>
+                {p.picked.size > 0 && (
+                  <>
+                    <span>
+                      <b>{p.picked.size.toLocaleString()}개</b> 선택
+                    </span>
+                    <button onClick={() => p.onPick(new Set())}>선택 해제</button>
+                  </>
+                )}
+              </div>
               <div className="list" ref={list} onScroll={measure}>
                 <div style={{ height: p.rows.length * ROW_H, position: 'relative' }}>
                   <div style={{ transform: `translateY(${view.from * ROW_H}px)` }}>
@@ -184,8 +245,15 @@ export function ResultsShell<T>(p: ShellProps<T>) {
                       <div
                         key={view.from + i}
                         className={`item ${r === row ? 'on' : ''}`}
-                        onClick={() => p.onSelect(view.from + i)}
+                        onClick={(e) => onItem(view.from + i, e)}
                       >
+                        <input
+                          type="checkbox"
+                          className="ck"
+                          tabIndex={-1}
+                          checked={p.picked.has(p.keyOf(r))}
+                          readOnly
+                        />
                         {p.renderRow(r)}
                       </div>
                     ))}

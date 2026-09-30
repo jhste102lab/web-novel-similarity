@@ -158,11 +158,10 @@ button {
 .t2 {
   background: var(--t2);
 }
+/* Marks cover the shared text; with padding, two marks around a one-sided change read as a space. */
 mark {
   background: var(--hl);
   color: inherit;
-  border-radius: 3px;
-  padding: 0 2px;
 }
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { CompareReport, RepeatReport } from '../export/Report.tsx'
-import { MAX_PASSAGES_PER_MATCH } from '../shared/constants.ts'
+import { useEffect, useMemo, useState } from 'react'
+import { contextOf } from '../export/context.ts'
+import { CompareReport, RepeatReport, type Amount } from '../export/Report.tsx'
 import type { CompareResult, RepeatResult } from '../shared/types.ts'
 import { runInWorker, type Run } from '../worker/client.ts'
 import { AnalyzingScreen } from './AnalyzingScreen.tsx'
@@ -8,7 +8,16 @@ import { ExportOverlay } from './ExportOverlay.tsx'
 import { Modal, type ModalProps } from './Modal.tsx'
 import { RepeatView } from './RepeatView.tsx'
 import { CompareView } from './CompareView.tsx'
-import { filterGroups, filterMatches, type CompareFilter, type RepeatFilter } from './results.ts'
+import {
+  filterGroups,
+  filterMatches,
+  groupKey,
+  matchKey,
+  searchGroups,
+  searchMatches,
+  type CompareFilter,
+  type RepeatFilter,
+} from './results.ts'
 import {
   FileReadError,
   loadSlot,
@@ -21,6 +30,14 @@ import {
 import { StartScreen, type SlotView } from './StartScreen.tsx'
 
 type Key = 'A' | 'B'
+
+/** What the report holds: the list as filtered and searched, its first N rows, or the ticked rows. */
+type Scope = 'view' | 'top' | 'picked'
+const TOP_N = [10, 50, 100]
+const AMOUNT_LABEL: Record<'compare' | 'repeat', Record<Amount, string>> = {
+  compare: { summary: '요약표만', part: '대조 일부', full: '대조 전부' },
+  repeat: { summary: '요약표만', part: '위치 일부', full: '위치 전부' },
+}
 
 type Screen =
   | { kind: 'start' }
@@ -50,9 +67,13 @@ export function App() {
   const [compareFilter, setCompareFilter] = useState<CompareFilter>('all')
   const [repeatFilter, setRepeatFilter] = useState<RepeatFilter>('all')
   const [selected, setSelected] = useState(0)
+  const [query, setQuery] = useState('')
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const [exporting, setExporting] = useState(false)
+  const [scope, setScope] = useState<Scope>('view')
+  const [top, setTop] = useState(TOP_N[0]!)
+  const [amount, setAmount] = useState<Amount>('full')
   const [runError, setRunError] = useState<string | null>(null)
-  const [perMatch, setPerMatch] = useState(MAX_PASSAGES_PER_MATCH)
 
   // Nothing is saved, so leaving the page (reload, close, back) loses the loaded files and
   // results; the browser asks first.
@@ -112,6 +133,8 @@ export function App() {
     setRunError(null)
     setCompareFilter('all')
     setRepeatFilter('all')
+    setQuery('')
+    setPicked(new Set())
     setSelected(0)
     setScreen({ kind: 'analyzing', run, pct: 0, two: b !== null })
     run.result.then(
@@ -157,6 +180,60 @@ export function App() {
 
   const results = screen.kind === 'results' ? screen : null
 
+  // Report rows for the chosen scope; worked out only while the export overlay is open.
+  const report = useMemo(() => {
+    if (!exporting || !results) return null
+    const r = results.result
+    const choose = <T,>(all: T[], view: T[], key: (row: T) => string) => ({
+      // Findings before the MAX_RESULTS cap, so a capped report does not read as complete.
+      total: r.total,
+      view: view.length,
+      rows:
+        scope === 'picked'
+          ? all.filter((row) => picked.has(key(row)))
+          : scope === 'top'
+            ? view.slice(0, top)
+            : view,
+    })
+    return r.kind === 'compare'
+      ? {
+          kind: 'compare' as const,
+          ...choose(
+            r.matches,
+            searchMatches(filterMatches(r.matches, compareFilter), query),
+            matchKey,
+          ),
+        }
+      : {
+          kind: 'repeat' as const,
+          ...choose(r.groups, searchGroups(filterGroups(r.groups, repeatFilter), query), groupKey),
+        }
+  }, [exporting, results, scope, top, picked, compareFilter, repeatFilter, query])
+  // Indexing the manuscript again takes a moment on a long one, so it is done once per overlay.
+  const resultA = results?.result.kind === 'repeat' ? results.a : null
+  const context = useMemo(
+    () => (exporting && resultA ? contextOf(slotEngineText(resultA)) : null),
+    [exporting, resultA],
+  )
+
+  const openExport = (): void => {
+    // Ticked rows are what the user most likely wants to export.
+    setScope((s) => (picked.size > 0 ? 'picked' : s === 'picked' ? 'view' : s))
+    setExporting(true)
+  }
+
+  const listProps = {
+    query,
+    onQuery: (q: string): void => {
+      setQuery(q)
+      setSelected(0)
+    },
+    selected,
+    onSelect: setSelected,
+    picked,
+    onPick: setPicked,
+  }
+
   return (
     <>
       <header className="top">
@@ -192,7 +269,7 @@ export function App() {
               >
                 새로 비교
               </button>
-              <button className="btn primary" onClick={() => setExporting(true)}>
+              <button className="btn primary" onClick={openExport}>
                 내보내기
               </button>
             </>
@@ -249,8 +326,7 @@ export function App() {
               setCompareFilter(f)
               setSelected(0)
             }}
-            selected={selected}
-            onSelect={setSelected}
+            {...listProps}
           />
         )}
         {results && results.result.kind === 'repeat' && (
@@ -264,45 +340,82 @@ export function App() {
               setRepeatFilter(f)
               setSelected(0)
             }}
-            selected={selected}
-            onSelect={setSelected}
+            {...listProps}
           />
         )}
       </main>
       {modal && <Modal {...modal} onNo={() => setModal(null)} />}
-      {exporting && results && (
+      {report && results && (
         <ExportOverlay
           fileName={`유사도 검사 ${today()}`}
           onClose={() => setExporting(false)}
           options={
-            results.result.kind === 'compare' && (
-              <label className="opt">
-                회차당 문장
-                <select value={perMatch} onChange={(e) => setPerMatch(Number(e.target.value))}>
-                  <option value={MAX_PASSAGES_PER_MATCH}>전체</option>
-                  <option value={5}>5개</option>
-                  <option value={1}>1개</option>
-                </select>
-              </label>
-            )
+            <>
+              <span className="opt">
+                범위
+                <span className="seg">
+                  <button className={scope === 'view' ? 'on' : ''} onClick={() => setScope('view')}>
+                    지금 목록 {report.view.toLocaleString()}개
+                  </button>
+                  {/* A div, not a button: a select inside a button does not open in every browser. */}
+                  <div className={scope === 'top' ? 'on' : ''} onClick={() => setScope('top')}>
+                    상위
+                    <select value={top} onChange={(e) => setTop(Number(e.target.value))}>
+                      {TOP_N.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    개
+                  </div>
+                  <button
+                    className={scope === 'picked' ? 'on' : ''}
+                    disabled={picked.size === 0}
+                    onClick={() => setScope('picked')}
+                  >
+                    선택한 {picked.size.toLocaleString()}개
+                  </button>
+                </span>
+              </span>
+              <span className="opt">
+                분량
+                <span className="seg">
+                  {(['summary', 'part', 'full'] as const).map((a) => (
+                    <button
+                      key={a}
+                      className={amount === a ? 'on' : ''}
+                      onClick={() => setAmount(a)}
+                    >
+                      {AMOUNT_LABEL[report.kind][a]}
+                    </button>
+                  ))}
+                </span>
+              </span>
+            </>
           }
         >
-          {results.result.kind === 'compare' ? (
+          {report.kind === 'compare' ? (
             <CompareReport
               meta={{
                 date: today(),
                 a: manuscriptLine(results.a),
                 b: results.b ? manuscriptLine(results.b) : undefined,
+                scope: scopeLine(report.rows.length, report.total),
               }}
-              all={results.result.matches}
-              rows={filterMatches(results.result.matches, compareFilter)}
-              perMatch={perMatch}
+              rows={report.rows}
+              amount={amount}
             />
           ) : (
             <RepeatReport
-              meta={{ date: today(), a: manuscriptLine(results.a) }}
-              all={results.result.groups}
-              rows={filterGroups(results.result.groups, repeatFilter)}
+              meta={{
+                date: today(),
+                a: manuscriptLine(results.a),
+                scope: scopeLine(report.rows.length, report.total),
+              }}
+              rows={report.rows}
+              amount={amount}
+              context={context!}
             />
           )}
         </ExportOverlay>
@@ -333,6 +446,13 @@ function rangeNote(a: Slot, b: Slot | null): string | null {
 function manuscriptLine(s: Slot): string {
   const b = slotBounds(s)
   return b === null ? s.title : `${s.title} · ${b[0] === 1 ? '' : `${b[0]}~`}${b[1]}화`
+}
+
+/** Report line saying how much of the result it holds. */
+function scopeLine(n: number, total: number): string {
+  return n === total
+    ? `전체 ${total.toLocaleString()}개`
+    : `${total.toLocaleString()}개 중 ${n.toLocaleString()}개`
 }
 
 function today(): string {

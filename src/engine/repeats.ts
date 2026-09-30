@@ -127,6 +127,7 @@ function buildResult(
     const occurrences = kept.map((id) => ({
       chapter: idx.chapter[id]! < 0 ? null : idx.chapter[id]!,
       sentenceIndex: idx.ordinal[id]!,
+      id,
     }))
     groups.push({ text: sentenceText(idx, first), occurrences })
   }

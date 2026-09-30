@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { charDiff } from '../engine/diff.ts'
 import type { ChapterMatch, CompareResult, Passage, Tier } from '../shared/types.ts'
 import { CopyButton, pairText } from './CopyButton.tsx'
@@ -9,7 +9,9 @@ import {
   chapterLabel,
   filterMatches,
   firstLine,
+  matchKey,
   ordinal,
+  searchMatches,
   TIER_CLASS,
   TIER_LABEL,
   type CompareFilter,
@@ -28,12 +30,15 @@ export function CompareView({
   rangeNote,
   filter,
   onFilter,
+  query,
+  onQuery,
   selected,
   onSelect,
+  picked,
+  onPick,
   running,
   stopped,
 }: Props) {
-  const [query, setQuery] = useState('')
   const rows = useMemo(
     () => searchMatches(filterMatches(result.matches, filter), query),
     [result, filter, query],
@@ -78,8 +83,11 @@ export function CompareView({
       rows={rows}
       selected={selected}
       onSelect={onSelect}
+      picked={picked}
+      onPick={onPick}
+      keyOf={matchKey}
       query={query}
-      onQuery={setQuery}
+      onQuery={onQuery}
       emptyText={query ? '찾는 조건에 맞는 결과가 없습니다.' : '의심되는 유사 문장이 없습니다.'}
       capped={cappedNote(result.matches.length, result.total)}
       running={running}
@@ -102,17 +110,6 @@ export function CompareView({
       )}
       renderDetail={(m) => <MatchDetail m={m} />}
     />
-  )
-}
-
-/** Matches whose chapter labels or passage text contain the query. */
-function searchMatches(matches: ChapterMatch[], query: string): ChapterMatch[] {
-  const q = query.trim()
-  if (q === '') return matches
-  return matches.filter(
-    (m) =>
-      `${chapterLabel(m.a)} ${chapterLabel(m.b)}`.includes(q) ||
-      m.passages.some((p) => p.a.text.includes(q) || p.b.text.includes(q)),
   )
 }
 

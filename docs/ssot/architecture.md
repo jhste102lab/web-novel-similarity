@@ -23,7 +23,7 @@ Where to look first for a given change. Tests sit next to their module.
 
 | Path                                                              | What lives there                                                                                        |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `src/main.tsx`                                                    | React root, stylesheet imports, service-worker registration                                             |
+| `src/main.tsx`                                                    | React root, stylesheet imports, service-worker registration, HWP reader preload after `load`            |
 | `src/shared/types.ts`                                             | Data contracts between parser, engine, worker and UI                                                    |
 | `src/shared/constants.ts`                                         | Every threshold and limit (table below)                                                                 |
 | `src/parsers/parseFile.ts`                                        | Extension → text; `.docx` via mammoth; `.hwp`/`.hwpx` by content (ZIP → HWPX, else HWP 5)               |
@@ -36,17 +36,17 @@ Where to look first for a given change. Tests sit next to their module.
 | `src/engine/common.ts`                                            | 흔한 표현 detection, chapter-range mask                                                                 |
 | `src/engine/compare.ts`                                           | A/B scan, passage chaining, chapter grouping, streaming snapshots                                       |
 | `src/engine/repeats.ts`                                           | 내부 반복: union-find over near-duplicates in one manuscript                                            |
-| `src/engine/diff.ts`                                              | Character diff shown in the detail pane and the report                                                  |
+| `src/engine/diff.ts`                                              | Character diff behind the marks in the detail pane and the report                                       |
 | `src/worker/`                                                     | `protocol.ts` messages, `worker.ts` entry, `client.ts` `runInWorker` (abort = terminate)                |
 | `src/app/App.tsx`                                                 | Screen state machine (start → analyzing → results), header, export wiring                               |
 | `src/app/StartScreen.tsx`, `SlotCard.tsx`, `RangeSlider.tsx`      | File slots, chapter table edits, 검사 범위                                                              |
 | `src/app/slot.ts`, `dropFiles.ts`                                 | Slot model and labels; folder drops                                                                     |
 | `src/app/AnalyzingScreen.tsx`                                     | Progress until the first findings arrive                                                                |
-| `src/app/ResultsShell.tsx`                                        | Shared result layout: windowed list, keyboard, search, panels                                           |
+| `src/app/ResultsShell.tsx`                                        | Shared result layout: windowed list, row ticks for export, keyboard, search, panels                     |
 | `src/app/CompareView.tsx`, `RepeatView.tsx`                       | Row and detail rendering for each mode                                                                  |
-| `src/app/results.ts`                                              | Tier labels, filters, position labels shared by views and report                                        |
-| `src/app/CopyButton.tsx`, `Marked.tsx`, `Modal.tsx`, `Panels.tsx` | Copy, diff marks, confirm dialog, diagnostics/shortcut HUDs                                             |
-| `src/app/ExportOverlay.tsx`, `src/export/`                        | Export dialog; printable report; PNG/PDF saving                                                         |
+| `src/app/results.ts`                                              | Tier labels, filters, search, row keys, position labels shared by views and report                      |
+| `src/app/CopyButton.tsx`, `Marked.tsx`, `Modal.tsx`, `Panels.tsx` | Copy, shared-text marks, confirm dialog, diagnostics/shortcut HUDs                                      |
+| `src/app/ExportOverlay.tsx`, `src/export/`                        | Export dialog; printable report; repeat context lookup; PNG pieces and PDF saving                       |
 | `src/app/styles/`                                                 | One stylesheet per screen; `export.css` holds the print rules                                           |
 | `public/sw.js`, `scripts/sw-precache.ts`                          | Offline cache; the build injects hashed file names                                                      |
 | `scripts/compare.ts`                                              | CLI: compare two files, or find repeats in one                                                          |
@@ -65,7 +65,7 @@ Where to look first for a given change. Tests sit next to their module.
 9. **Repeats** — `engine/repeats.ts`: union-find over near-duplicate sentence pairs inside one manuscript; occurrences closer than `REPEAT_MIN_GAP` sentences count once.
 10. **Result cap** — chapter pairs are sorted by 거의 동일 count, then matched-sentence count, and cut to `MAX_RESULTS`; `total` carries the uncapped count and the UI says how many were hidden.
 11. **Streaming** — every `PARTIAL_EVERY_MS` the scan regroups the pairs found so far and posts them as a `partial` response. The UI leaves the progress screen at the first partial, so review starts about a second into a 2M-char run instead of after it. Stopping keeps what was scanned.
-12. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened; 1-char equal islands are folded into the surrounding change.
+12. **Diff for display** — `engine/diff.ts`: LCS character diff per passage, computed when a result row is opened or a report row is rendered; 1-char equal islands are folded into the surrounding change. Above 250,000 LCS cells (a whole copied chapter) the texts are first matched sentence by sentence and only the unmatched stretches between equal sentences are diffed by character. The UI marks the **shared** text (`Marked.tsx`).
 
 Scale target: 500 chapters × 4,000 chars per side (≈ 2M chars), ≤ 5 s.
 Measured: ~1.5–1.7 s in Node and ~3.6 s end to end in Chrome including parsing
@@ -127,7 +127,8 @@ interface CompareResult {
 }
 interface RepeatGroup {
   text: string
-  occurrences: { chapter: number | null; sentenceIndex: number }[]
+  // id: sentence id in indexSentences() of the searched text, for the report's context lookup
+  occurrences: { chapter: number | null; sentenceIndex: number; id: number }[]
 }
 interface RepeatResult {
   kind: 'repeat'
@@ -169,14 +170,15 @@ All in `src/shared/constants.ts`; rationale in
 The two result views (`CompareView`, `RepeatView`) share `ResultsShell` in `src/app/ResultsShell.tsx`:
 
 - **Windowed list** — rows are a fixed 75 px (`.item` in `styles/results.css`, `ROW_H` in `ResultsShell.tsx`), so 3,000 findings render as ~20 nodes.
-- **Keyboard** — `j`/`k`/arrows, `g`/`G`, `/` to search, `c` to copy, `d` for diagnostics, `?` for the sheet.
+- **Keyboard** — `j`/`k`/arrows, `g`/`G`, `/` to search, `x` to tick a row for export, `c` to copy, `d` for diagnostics, `?` for the sheet. Shift+click ticks every row between the last clicked one and this one; 전체 선택 ticks the rows the tab and search leave visible. Ticks are keyed by chapter pair / group text (`matchKey`, `groupKey`) and live in `App`, like the search query, so the export can use them.
+- **Repeat detail** — the first 100 places of a group are listed; `외 N곳 더 보기` lists the rest.
 - **Diagnostics** (`src/app/Panels.tsx`) — phase timings plus `pairsScored / pairsNaive`, which is what the fingerprint index buys: 0.014 % on a 2M × 2M-char run.
 
 ## Offline
 
-`public/sw.js` caches the shell and this build's JS/CSS at install, then every
-same-origin GET as it is requested (so rhwp's WASM, ~3.7 MB gzipped, is cached
-the first time an HWP 5 file is opened, not at install).
+`public/sw.js` caches the shell and this build's JS, CSS and rhwp's WASM
+(~3.7 MB gzipped, ADR 0006) at install, then every same-origin GET as it is
+requested.
 Assets are cache-first (their names carry a
 content hash, so a hit is never the wrong file); **navigations are network-first**
 with a cache fallback, because the HTML shell names the hashed assets of its build
@@ -187,12 +189,18 @@ the "nothing is uploaded" claim.
 
 ## Export
 
-- **PDF**: `window.print()` with `@media print` rules in `src/app/styles/export.css`. The report keeps selectable text and the browser paginates it. Rasterising the whole report into one image produced blank pages once it exceeded the canvas height limit.
-- **PNG**: `html2canvas-pro`, scale capped so neither side exceeds `MAX_CANVAS_SIDE` (16,000 px).
+The overlay picks what goes in (**범위**) and how much of each row (**분량**); rows come from `App.tsx`:
+
+- 범위: 지금 목록 (tab + search, as on screen), 상위 10/50/100 of that list, or 선택한 N개 (ticked rows, whatever the tab). Opening the overlay with ticked rows selects 선택한 N개.
+- 분량: 요약표만 (one table row per finding), 일부 (compare: the first 3 sentences of each passage, repeat: the first 3 places, then `… 외 N`), 전부 (default). Repeat places show the sentence before and after within the same chapter segment, short ones included (`src/export/context.ts` re-indexes the searched text, finds the occurrence by `id`, and reads the neighbours from the raw text). The report's 범위 line counts against the uncapped `total`.
+- The header shows `A4 약 N쪽`: the report cloned at the A4 text width (688 px) divided by 920 px, a figure calibrated against Chrome's PDF of `docs/samples`.
+- **PDF**: `window.print()` with `@media print` rules in `src/app/styles/export.css`. The report keeps selectable text and the browser paginates it. The print rules undo the overlay's scroll box and height cap (with them the printout stopped after one screenful), print two-column blocks as tables so every browser can split them across pages, and keep colours (`print-color-adjust: exact`).
+- **PNG**: `html2canvas-pro` at 2×. A report taller than one canvas (`MAX_CANVAS_SIDE`, 16,000 px) is cut into pieces of whole rows (a longer row is split between its children, a summary table between its rows with the header repeated), each rendered from a clone outside the overlay and zipped with fflate (stored, not deflated). Marks are split per word in the clones and words kept whole: html2canvas paints a mark that wraps as one box over both lines.
 
 ## Build and deploy
 
 Vite static build → `dist/`; GitHub Actions workflow on `main` publishes to
 GitHub Pages. `base` is `/web-novel-similarity/`, the repository name. No environment
 variables. `html2canvas-pro`, `mammoth` and `@rhwp/core` are dynamically
-imported so they stay out of the initial bundle.
+imported so they stay out of the initial bundle; rhwp is then fetched after the
+page's `load` event (ADR 0006).
