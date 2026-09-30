@@ -16,6 +16,7 @@ import {
   ordinal,
   sortGroups,
   sortMatches,
+  TIER_LABEL,
   where,
   type CompareFilter,
   type Order,
@@ -199,11 +200,19 @@ export function App() {
   const fileA = useMemo(() => (slotA ? slotFileAt(slotA) : null), [slotA])
   const fileB = useMemo(() => (slotB ? slotFileAt(slotB) : null), [slotB])
 
-  // The report holds every finding, in the order the list shows, whatever the tab or search.
+  // The report holds the active tab's findings (search ignored), in the order the list shows.
   // 내보내기 opens a preview of its first pages; saving asks, then builds the whole file.
   const startPdf = (): void => {
     if (!results || !aroundA || !fileA) return
-    const input = pdfInput(results, order, aroundA, aroundB, fileA, fileB)
+    const input = pdfInput(
+      results,
+      order,
+      { compare: compareFilter, repeat: repeatFilter },
+      aroundA,
+      aroundB,
+      fileA,
+      fileB,
+    )
     const preview = exportPdf(input, () => {}, PREVIEW_PAGES)
     setPdf({ input, preview })
     preview.result.then(
@@ -466,10 +475,11 @@ function manuscriptLine(s: Slot): string {
   return b === null ? s.title : `${s.title} · ${b[0] === 1 ? '' : `${b[0]}~`}${b[1]}화`
 }
 
-/** Report data: every finding in list order, each side with the sentences around it. */
+/** Report data: the findings of the active tab (search ignored) in list order, with context. */
 function pdfInput(
   r: { result: CompareResult | RepeatResult; a: Slot; b: Slot | null; stopped?: boolean },
   order: Order,
+  filter: { compare: CompareFilter; repeat: RepeatFilter },
   aroundA: AroundFn,
   aroundB: AroundFn | null,
   fileA: FileFn,
@@ -494,10 +504,11 @@ function pdfInput(
           '결과',
           `회차 쌍 ${m.length.toLocaleString()}개 · 거의 동일 ${filterMatches(m, 'near').length.toLocaleString()}개 · 일부 수정 ${filterMatches(m, 'edited').length.toLocaleString()}개`,
         ],
+        ['담은 결과', filter.compare === 'all' ? '전체' : `${TIER_LABEL[filter.compare]}만`],
         ['정렬', order === 'chapter' ? '회차순' : '유사도순'],
         ...stopped,
       ],
-      rows: sortMatches(m, order).map((x) => {
+      rows: sortMatches(filterMatches(m, filter.compare), order).map((x) => {
         const first = x.passages[0]!
         return {
           a: `${fileA(first.a.start)} · ${chapterLabel(x.a)}`,
@@ -527,10 +538,11 @@ function pdfInput(
         '결과',
         `반복 문장 ${g.length.toLocaleString()}개 · 3회 이상 ${filterGroups(g, 3).length.toLocaleString()}개 · 5회 이상 ${filterGroups(g, 5).length.toLocaleString()}개`,
       ],
+      ['담은 결과', filter.repeat === 'all' ? '전체' : `${filter.repeat}회 이상만`],
       ['정렬', order === 'chapter' ? '회차순' : '반복 많은 순'],
       ...stopped,
     ],
-    rows: sortGroups(g, order).map((x) => ({
+    rows: sortGroups(filterGroups(g, filter.repeat), order).map((x) => ({
       title: `${x.occurrences.length}회 · ${groupSpan(x)}`,
       places: x.occurrences.map((o) => ({
         label: o.chapter === null ? where(o) : `${where(o)} · ${ordinal(o)}`,

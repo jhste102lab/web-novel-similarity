@@ -201,8 +201,8 @@ the "nothing is uploaded" claim.
 내보내기 opens the `.ov` overlay at once and builds a **preview** of the report's
 first `PREVIEW_PAGES` (30) pages, shown in the browser's own PDF viewer
 (`<iframe>` on a blob URL) with `전체 N쪽 · 앞 30쪽 미리보기`. There is no export
-setting. The report holds **every finding**, regardless of tab or search, in the
-list's current sort order. The per-chapter-pair passage limit still applies;
+setting. The report holds the **active tab's findings** (search ignored; the
+first page's `담은 결과` names the tab), in the list's current sort order. The per-chapter-pair passage limit still applies;
 repeats include every place.
 
 - **Client** — `src/export/exportPdf.ts` starts a fresh worker per build and returns `{ blob, pages }`. `PDF로 저장` asks `PDF로 저장할까요?` (예/아니오); then the whole report is built with `PDF 만드는 중 n / N쪽`, a bar and 취소 in the overlay header, downloaded, and the overlay closes. A report of 30 pages or fewer saves the preview file itself. Closing or cancelling terminates the worker; a failure is shown in the overlay body. The download name is `유사도 검사 2026. 9. 30.pdf` for that date.
