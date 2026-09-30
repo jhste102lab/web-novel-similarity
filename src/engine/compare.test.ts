@@ -4,7 +4,7 @@ import { compare } from './compare.ts'
 import { charDiff } from './diff.ts'
 import { boundedEditDistance } from './editDistance.ts'
 import { findRepeats } from './repeats.ts'
-import { indexSentences } from './sentences.ts'
+import { indexSentences, sentenceText } from './sentences.ts'
 
 const doc = (chapters: string[][]): ManuscriptText => {
   let text = ''
@@ -91,19 +91,23 @@ describe('compare', () => {
 })
 describe('findRepeats', () => {
   it('groups recurring sentences across chapters and skips adjacent duplicates', () => {
-    const r = findRepeats(
-      doc([
-        [
-          '반복되는 문장이 있다.',
-          '반복되는 문장이 있다.',
-          '아무 관계 없는 이야기.',
-          '다른 이야기가 이어진다.',
-        ],
-        ['또 다른 이야기가 이어진다.', '이야기는 계속된다.', '반복되는 문장이 있다.'],
-      ]),
-    )
+    const m = doc([
+      [
+        '반복되는 문장이 있다.',
+        '반복되는 문장이 있다.',
+        '아무 관계 없는 이야기.',
+        '다른 이야기가 이어진다.',
+      ],
+      ['또 다른 이야기가 이어진다.', '이야기는 계속된다.', '반복되는 문장이 있다.'],
+    ])
+    const r = findRepeats(m)
     expect(r.groups).toHaveLength(1)
     expect(r.groups[0]!.occurrences.map((o) => o.chapter)).toEqual([1, 2])
+    const idx = indexSentences(m.text, m.chapters)
+    expect(r.groups[0]!.occurrences.map((o) => sentenceText(idx, o.id))).toEqual([
+      '반복되는 문장이 있다.',
+      '반복되는 문장이 있다.',
+    ])
   })
 })
 
@@ -114,6 +118,28 @@ describe('charDiff', () => {
       { op: 'del', text: '미끄러졌' },
       { op: 'ins', text: '흘러내렸' },
       { op: 'eq', text: '다' },
+    ])
+  })
+
+  it('anchors a whole-chapter diff on sentences and keeps both texts intact', () => {
+    const lines = Array.from({ length: 60 }, (_, i) => `${i}번째 사람이 길을 따라 천천히 걸어갔다.`)
+    const a = lines.join(' ')
+    const b = lines
+      .map((l, i) => (i === 30 ? '그리고 ' + l.replace('천천히', '빠르게') : l))
+      .join(' ')
+    expect(a.length * b.length).toBeGreaterThan(250_000)
+    const d = charDiff(a, b)
+    const side = (skip: 'ins' | 'del'): string =>
+      d
+        .filter((o) => o.op !== skip)
+        .map((o) => o.text)
+        .join('')
+    expect(side('ins')).toBe(a)
+    expect(side('del')).toBe(b)
+    expect(d.filter((o) => o.op !== 'eq').map((o) => o.text)).toEqual([
+      '그리고 ',
+      '천천히',
+      '빠르게',
     ])
   })
 })

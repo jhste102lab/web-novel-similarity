@@ -1,7 +1,7 @@
 # 0005 — Read HWP 5 with rhwp; decide HWP vs HWPX by content
 
 Status: Accepted (2026-09-30). Amends ADR 0001 (`.hwp` excluded) and ADR 0003
-(parsing libraries).
+(parsing libraries). Loading and caching of the WASM amended by ADR 0006.
 
 ## Context
 

@@ -67,6 +67,8 @@ export interface CompareResult {
 export interface Occurrence {
   chapter: number | null
   sentenceIndex: number
+  /** Sentence id in `indexSentences` of the searched text; the report reads the sentence and its neighbours by it. */
+  id: number
 }
 
 export interface RepeatGroup {
