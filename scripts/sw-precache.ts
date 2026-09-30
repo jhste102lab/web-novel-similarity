@@ -6,9 +6,9 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 const dist = new URL('../dist/', import.meta.url)
 const assets = readdirSync(new URL('assets/', dist))
-  // Fonts are fetched on demand and are 3 MB of subsets. Code, styles and the HWP 5 reader's
-  // WASM (loaded after every page load, ADR 0006) are what the app needs offline.
-  .filter((f) => f.endsWith('.js') || f.endsWith('.css') || f.endsWith('.wasm'))
+  // Page fonts are fetched on demand and are 3 MB of subsets. Code, styles, the HWP 5 reader's
+  // WASM (loaded after every page load, ADR 0006) and the report's TTF are what the app needs offline.
+  .filter((f) => /\.(js|css|wasm|ttf)$/.test(f))
   .map((f) => `assets/${f}`)
 
 const sw = new URL('sw.js', dist)

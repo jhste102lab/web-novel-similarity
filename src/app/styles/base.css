@@ -17,6 +17,10 @@
 * {
   box-sizing: border-box;
 }
+html.busy,
+html.busy * {
+  cursor: progress !important;
+}
 html,
 body {
   margin: 0;
@@ -145,6 +149,90 @@ button {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.modal .bar {
+  margin: -8px 0 22px;
+}
+/* Export preview: the built PDF in the browser's own viewer, with save and close. */
+.ov {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0/0.45);
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+.ov .panel {
+  background: var(--card);
+  border-radius: 18px;
+  width: min(1200px, 100%);
+  height: calc(100dvh - 64px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+.ov .ph {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px 14px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.ov h2 {
+  margin: 0 auto 0 0;
+  font-size: 18px;
+}
+.ov .est {
+  color: var(--meta);
+}
+.ov .x {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 22px;
+  color: var(--meta);
+}
+.ov .x:hover {
+  background: var(--muted);
+  color: var(--fg);
+}
+.ov iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.ov .wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--meta);
+  padding: 24px;
+}
+.ov .saving {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+.ov .saving .bar {
+  width: 140px;
+}
+/* A transform animation keeps turning while parsing blocks the main thread. */
+.spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  border: 3px solid var(--muted);
+  border-top-color: var(--fg);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .dot {
   width: 8px;

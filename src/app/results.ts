@@ -32,21 +32,23 @@ export function searchGroups(groups: RepeatGroup[], query: string): RepeatGroup[
   return groups.filter((g) => g.text.includes(q) || g.occurrences.some((o) => where(o).includes(q)))
 }
 
-/** Identity of a result row for the export selection; stable across streamed updates. */
-export function matchKey(m: ChapterMatch): string {
-  return `${m.a}:${m.b}`
+/** 회차순 (default: read front to back) or the engine's order (strongest / most repeated first). */
+export type Order = 'chapter' | 'score'
+
+export function sortMatches(matches: ChapterMatch[], order: Order): ChapterMatch[] {
+  return order === 'score'
+    ? matches
+    : matches.toSorted((x, y) => (x.a ?? -1) - (y.a ?? -1) || (x.b ?? -1) - (y.b ?? -1))
 }
 
-export function groupKey(g: RepeatGroup): string {
-  return g.text
+export function sortGroups(groups: RepeatGroup[], order: Order): RepeatGroup[] {
+  return order === 'score'
+    ? groups
+    : groups.toSorted((x, y) => x.occurrences[0]!.start - y.occurrences[0]!.start)
 }
 
-/** Warning shown when the MAX_RESULTS cap dropped the weakest findings. */
-export function cappedNote(shown: number, total: number): string | null {
-  return total > shown
-    ? `전체 ${total.toLocaleString()}개 중 상위 ${shown.toLocaleString()}개만 표시해요`
-    : null
-}
+/** The file an engine-text offset came from. */
+export type FileFn = (pos: number) => string
 
 /** "127화", or "본문" for a manuscript without chapters. */
 export function chapterLabel(chapter: number | null): string {

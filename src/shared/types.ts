@@ -18,6 +18,9 @@ export interface Span {
   chapter: number | null
   sentenceIndex: number
   text: string
+  /** [start, end) offsets in the engine text, for the sentences around it. */
+  start: number
+  end: number
 }
 
 export interface Passage {
@@ -59,16 +62,15 @@ export interface RunStats {
 export interface CompareResult {
   kind: 'compare'
   matches: ChapterMatch[]
-  /** Chapter pairs found before the MAX_RESULTS cap. */
-  total: number
   stats: RunStats
 }
 
 export interface Occurrence {
   chapter: number | null
   sentenceIndex: number
-  /** Sentence id in `indexSentences` of the searched text; the report reads the sentence and its neighbours by it. */
-  id: number
+  /** [start, end) offsets of the sentence in the engine text, for the sentences around it. */
+  start: number
+  end: number
 }
 
 export interface RepeatGroup {
@@ -79,8 +81,6 @@ export interface RepeatGroup {
 export interface RepeatResult {
   kind: 'repeat'
   groups: RepeatGroup[]
-  /** Groups found before the MAX_RESULTS cap. */
-  total: number
   stats: RunStats
 }
 

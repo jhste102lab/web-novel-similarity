@@ -1,47 +1,58 @@
 import { useMemo } from 'react'
+import type { Around } from '../engine/context.ts'
 import { charDiff } from '../engine/diff.ts'
-import type { ChapterMatch, CompareResult, Passage, Tier } from '../shared/types.ts'
+import type { PdfSide } from '../export/pdf.ts'
+import type { ChapterMatch, CompareResult, Tier } from '../shared/types.ts'
+import { blocksOf, type JoinFn } from './blocks.ts'
 import { CopyButton, pairText } from './CopyButton.tsx'
 import { Marked } from './Marked.tsx'
 import { ResultsShell, Tab, type ViewProps } from './ResultsShell.tsx'
 import {
-  cappedNote,
   chapterLabel,
   filterMatches,
   firstLine,
-  matchKey,
-  ordinal,
   searchMatches,
+  sortMatches,
   TIER_CLASS,
   TIER_LABEL,
   type CompareFilter,
+  type FileFn,
 } from './results.ts'
+
+export type AroundFn = (start: number, end: number) => Around
 
 interface Props extends ViewProps<CompareResult, CompareFilter> {
   titleB: string
   rangeNote: string | null
+  joinA: JoinFn
+  joinB: JoinFn
+  fileA: FileFn
+  fileB: FileFn
 }
-
-/** A ↔ B results: one row per chapter pair, the detail pane shows its passages side by side. */
+/** A ↔ B results: one row per chapter pair, the detail pane shows its findings side by side. */
 export function CompareView({
   result,
   titleA,
   titleB,
   rangeNote,
+  joinA,
+  joinB,
+  fileA,
+  fileB,
   filter,
   onFilter,
   query,
   onQuery,
   selected,
   onSelect,
-  picked,
-  onPick,
+  order,
+  onOrder,
   running,
   stopped,
 }: Props) {
   const rows = useMemo(
-    () => searchMatches(filterMatches(result.matches, filter), query),
-    [result, filter, query],
+    () => searchMatches(filterMatches(sortMatches(result.matches, order), filter), query),
+    [result, filter, query, order],
   )
   const tierTab = (t: Tier) => (
     <Tab
@@ -83,13 +94,12 @@ export function CompareView({
       rows={rows}
       selected={selected}
       onSelect={onSelect}
-      picked={picked}
-      onPick={onPick}
-      keyOf={matchKey}
+      order={order}
+      onOrder={onOrder}
+      scoreLabel="유사도순"
       query={query}
       onQuery={onQuery}
       emptyText={query ? '찾는 조건에 맞는 결과가 없습니다.' : '의심되는 유사 문장이 없습니다.'}
-      capped={cappedNote(result.matches.length, result.total)}
       running={running}
       stopped={stopped}
       stats={result.stats}
@@ -108,17 +118,36 @@ export function CompareView({
           </div>
         </>
       )}
-      renderDetail={(m) => <MatchDetail m={m} />}
+      renderDetail={(m) => (
+        <MatchDetail m={m} joinA={joinA} joinB={joinB} fileA={fileA} fileB={fileB} />
+      )}
     />
   )
 }
 
-function MatchDetail({ m }: { m: ChapterMatch }) {
+function MatchDetail({
+  m,
+  joinA,
+  joinB,
+  fileA,
+  fileB,
+}: {
+  m: ChapterMatch
+  joinA: JoinFn
+  joinB: JoinFn
+  fileA: FileFn
+  fileB: FileFn
+}) {
+  const first = m.passages[0]!
+  const blocks = useMemo(
+    () => blocksOf(m.passages, joinA, joinB, fileA, fileB),
+    [m, joinA, joinB, fileA, fileB],
+  )
   return (
     <>
       <div className="head">
-        <span className="pct">
-          A {chapterLabel(m.a)} ↔ B {chapterLabel(m.b)}
+        <span className="pct files">
+          A {fileA(first.a.start)} <span>↔</span> B {fileB(first.b.start)}
         </span>
         <span className="tier">{TIER_LABEL[m.tier]}</span>
         <span className="where">
@@ -126,30 +155,63 @@ function MatchDetail({ m }: { m: ChapterMatch }) {
           {m.runs > m.passages.length && ` (상위 ${m.passages.length}개 표시)`}
         </span>
       </div>
-      {m.passages.map((p, i) => (
-        <PassagePair key={i} p={p} />
+      <div className="cmp chs">
+        <div>{chapterLabel(m.a)}</div>
+        <div>{chapterLabel(m.b)}</div>
+      </div>
+      {blocks.map((blk, i) => (
+        <div key={i} className="cmp blk">
+          <Stretch side={blk.a} k="A" />
+          <div className="stack">
+            {blk.b.map((s, j) => (
+              <Stretch key={j} side={s} k="B" />
+            ))}
+          </div>
+        </div>
       ))}
     </>
   )
 }
 
-function PassagePair({ p }: { p: Passage }) {
-  const diff = useMemo(() => charDiff(p.a.text, p.b.text), [p])
+/** One side's stretch: neighbours dimmed, each finding marked against the text it matched. */
+function Stretch({ side, k }: { side: PdfSide; k: 'A' | 'B' }) {
+  const found = side.pieces.filter((p) => typeof p.other === 'string')
   return (
-    <div className="cmp">
-      <div className="pane">
-        <div className="k">
-          <b>A</b> {ordinal(p.a)}
-          <CopyButton a={p.a.text} b={p.b.text} />
-        </div>
-        <Marked diff={diff} side="a" />
+    <div className="pane">
+      <div className="k">
+        <b>{k}</b> {side.label}
+        {k === 'A' && (
+          <CopyButton
+            a={found.map((p) => p.text).join('\n')}
+            b={found.map((p) => p.other).join('\n')}
+          />
+        )}
       </div>
-      <div className="pane">
-        <div className="k">
-          <b>B</b> {ordinal(p.b)}
-        </div>
-        <Marked diff={diff} side="b" />
-      </div>
+      <div className="lnk">{side.link}</div>
+      {side.pieces.map((p, i) =>
+        typeof p.other === 'string' ? (
+          <Marked
+            key={i}
+            diff={k === 'A' ? charDiff(p.text, p.other) : charDiff(p.other, p.text)}
+            side={k === 'A' ? 'a' : 'b'}
+          />
+        ) : (
+          <span key={i} className="ctx">
+            {p.text}
+          </span>
+        ),
+      )}
     </div>
+  )
+}
+
+/** A finding between the sentences around it, which are dimmed and never marked. */
+export function Context({ around, children }: { around: Around; children: React.ReactNode }) {
+  return (
+    <>
+      {around.before && <span className="ctx">{around.before}</span>}
+      {children}
+      {around.after && <span className="ctx">{around.after}</span>}
+    </>
   )
 }

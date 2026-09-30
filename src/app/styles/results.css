@@ -81,47 +81,30 @@
   font-weight: 600;
   background: var(--card);
 }
-.selbar {
+.sortbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   flex: none;
   height: 44px;
-  padding: 0 20px 0 14px;
+  padding: 0 20px;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
+}
+.sortbar button {
   color: var(--meta);
 }
-.selbar label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--fg);
-  font-weight: 500;
-  cursor: pointer;
-}
-.selbar b {
+.sortbar button:hover,
+.sortbar button.on {
   color: var(--fg);
 }
-.selbar button {
-  margin-left: auto;
-  color: var(--meta);
-}
-.selbar button:hover {
-  color: var(--fg);
-}
-.selbar input,
-.item .ck {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--fg);
-  cursor: pointer;
+.sortbar button.on {
+  font-weight: 600;
 }
 .item {
   display: flex;
   gap: 12px;
-  padding: 16px 20px 16px 14px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   /* Fixed so the list can be windowed; ROW_H in ResultsShell.tsx must match. */
@@ -129,15 +112,13 @@
   box-sizing: border-box;
   overflow: hidden;
   transition: background-color 120ms ease;
-  /* Shift+click ticks a range; it should not also select the row text. */
-  user-select: none;
-}
-.item .ck {
-  flex: none;
-  margin-top: 4px;
 }
 .item:hover {
   background: var(--bg);
+}
+/* Sentences around a finding, for context; never marked. */
+.ctx {
+  color: var(--meta);
 }
 .item.on {
   background: var(--muted);
@@ -181,12 +162,22 @@
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+.detail .head .pct.files {
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+.detail .head .pct span {
+  color: var(--meta);
+  margin: 0 4px;
+}
 .detail .head .tier {
   font-weight: 600;
+  white-space: nowrap;
 }
 .detail .head .where {
   color: var(--meta);
   margin-left: auto;
+  white-space: nowrap;
 }
 /* In the repeat header the copy button sits beside the count, so the span keeps the right edge. */
 .detail .head .copy {
@@ -199,6 +190,34 @@
 }
 .detail .cmp + .cmp {
   margin-top: 16px;
+}
+/* Each side's 회차 over its column. */
+.detail .cmp.chs {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 0 4px;
+}
+.detail .cmp.chs + .blk {
+  margin-top: 8px;
+}
+/* One A stretch beside every B stretch it matched; blocks apart. */
+.detail .blk {
+  align-items: start;
+}
+.detail .blk + .blk {
+  margin-top: 28px;
+}
+.detail .blk .stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pane .lnk {
+  white-space: normal;
+  font-size: 12px;
+  color: var(--meta);
+  margin: -6px 0 10px;
 }
 .pane {
   white-space: pre-line;
@@ -232,6 +251,7 @@
   gap: 20px;
   font-size: 15px;
   line-height: 1.8;
+  white-space: pre-line;
 }
 .occ .ch {
   flex: none;

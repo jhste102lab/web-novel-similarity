@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RunStats } from '../shared/types.ts'
 import { copyText } from './CopyButton.tsx'
 import { Diagnostics, Shortcuts } from './Panels.tsx'
+import type { Order } from './results.ts'
 
 /** Props every result view takes from App. */
 export interface ViewProps<R, F> {
@@ -13,9 +14,8 @@ export interface ViewProps<R, F> {
   onQuery: (q: string) => void
   selected: number
   onSelect: (i: number) => void
-  /** Keys of the rows ticked for export. */
-  picked: ReadonlySet<string>
-  onPick: (next: Set<string>) => void
+  order: Order
+  onOrder: (o: Order) => void
   /** Findings are still streaming in from the worker. */
   running: boolean
   /** The user stopped the run, so the findings cover only part of the manuscript. */
@@ -65,9 +65,10 @@ interface ShellProps<T> {
   rows: T[]
   selected: number
   onSelect: (i: number) => void
-  picked: ReadonlySet<string>
-  onPick: (next: Set<string>) => void
-  keyOf: (row: T) => string
+  order: Order
+  onOrder: (o: Order) => void
+  /** Label of the 'score' order: 유사도순 / 반복 많은 순. */
+  scoreLabel: string
   renderRow: (row: T) => React.ReactNode
   renderDetail: (row: T) => React.ReactNode
   /** Text `c` copies for the selected row. */
@@ -75,7 +76,6 @@ interface ShellProps<T> {
   query: string
   onQuery: (q: string) => void
   emptyText: string
-  capped: string | null
   running: boolean
   stopped: boolean
   stats: RunStats
@@ -117,34 +117,6 @@ export function ResultsShell<T>(p: ShellProps<T>) {
     measure()
   }, [p.selected, p.rows.length, measure])
 
-  // Shift+click ticks every row between the last clicked one and this one.
-  const anchor = useRef<number | null>(null)
-  useEffect(() => {
-    anchor.current = null
-  }, [p.rows])
-  const isPicked = (i: number): boolean => p.picked.has(p.keyOf(p.rows[i]!))
-  const pick = (from: number, to: number, on: boolean): void => {
-    const next = new Set(p.picked)
-    for (let i = Math.min(from, to); i <= Math.max(from, to); i++) {
-      const k = p.keyOf(p.rows[i]!)
-      if (on) next.add(k)
-      else next.delete(k)
-    }
-    p.onPick(next)
-  }
-  const onItem = (i: number, e: React.MouseEvent): void => {
-    const box = (e.target as HTMLElement).classList.contains('ck')
-    if (e.shiftKey && anchor.current !== null) pick(anchor.current, i, box ? !isPicked(i) : true)
-    else if (box) pick(i, i, !isPicked(i))
-    anchor.current = i
-    p.onSelect(i)
-  }
-  const pickedHere = p.rows.reduce((n, r) => n + (p.picked.has(p.keyOf(r)) ? 1 : 0), 0)
-  const allBox = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (allBox.current) allBox.current.indeterminate = pickedHere > 0 && pickedHere < p.rows.length
-  })
-
   const flash = (text: string): void => {
     setToast(text)
     setTimeout(() => setToast(null), 1600)
@@ -178,12 +150,6 @@ export function ResultsShell<T>(p: ShellProps<T>) {
       void copyText(p.copyOf(row)).then(() => flash('문장을 복사했어요'))
       return
     }
-    if (key === 'x') {
-      const i = row ? p.rows.indexOf(row) : -1
-      if (i < 0) return
-      anchor.current = i
-      return pick(i, i, !isPicked(i))
-    }
     const step = key === 'j' || key === 'ArrowDown' ? 1 : key === 'k' || key === 'ArrowUp' ? -1 : 0
     if (step !== 0) {
       e.preventDefault()
@@ -198,7 +164,6 @@ export function ResultsShell<T>(p: ShellProps<T>) {
       <div className="bar-top">
         <div className="title">
           {p.title}
-          {p.capped && <span className="rng">{p.capped}</span>}
           {p.stopped && <span className="rng stop">중단됨 · 검사한 곳까지의 결과예요</span>}
         </div>
         <div className="tabs">
@@ -219,24 +184,16 @@ export function ResultsShell<T>(p: ShellProps<T>) {
         ) : (
           <>
             <div className="col">
-              <div className="selbar">
-                <label>
-                  <input
-                    type="checkbox"
-                    ref={allBox}
-                    checked={pickedHere === p.rows.length}
-                    onChange={(e) => pick(0, p.rows.length - 1, e.target.checked)}
-                  />
-                  전체 선택
-                </label>
-                {p.picked.size > 0 && (
-                  <>
-                    <span>
-                      <b>{p.picked.size.toLocaleString()}개</b> 선택
-                    </span>
-                    <button onClick={() => p.onPick(new Set())}>선택 해제</button>
-                  </>
-                )}
+              <div className="sortbar">
+                {(['chapter', 'score'] as const).map((o) => (
+                  <button
+                    key={o}
+                    className={p.order === o ? 'on' : ''}
+                    onClick={() => transition(() => p.onOrder(o))}
+                  >
+                    {o === 'chapter' ? '회차순' : p.scoreLabel}
+                  </button>
+                ))}
               </div>
               <div className="list" ref={list} onScroll={measure}>
                 <div style={{ height: p.rows.length * ROW_H, position: 'relative' }}>
@@ -245,15 +202,8 @@ export function ResultsShell<T>(p: ShellProps<T>) {
                       <div
                         key={view.from + i}
                         className={`item ${r === row ? 'on' : ''}`}
-                        onClick={(e) => onItem(view.from + i, e)}
+                        onClick={() => p.onSelect(view.from + i)}
                       >
-                        <input
-                          type="checkbox"
-                          className="ck"
-                          tabIndex={-1}
-                          checked={p.picked.has(p.keyOf(r))}
-                          readOnly
-                        />
                         {p.renderRow(r)}
                       </div>
                     ))}

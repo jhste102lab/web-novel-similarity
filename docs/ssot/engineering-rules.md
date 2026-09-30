@@ -11,14 +11,14 @@ src/
   engine/      pure TypeScript, no DOM, no React. Input: text + chapter offsets. Output: result types.
   parsers/     file → { text, chapters }. One file per format (txt, hwp, hwpx; docx inline). No UI.
   worker/      Web Worker entry; owns the message protocol; calls engine + parsers.
-  app/         React: screens, components, hooks. Talks to the worker only through `worker/client.ts`.
-  app/styles/  one stylesheet per screen (base, start, analyzing, results, export incl. print), imported in order by `main.tsx`.
-  export/      report DOM → PDF/PNG.
+  app/         React: screens, components, hooks. Analysis via `worker/client.ts`; PDF via `export/exportPdf.ts`.
+  app/styles/  one stylesheet per screen (base, start, analyzing, results), imported in order by `main.tsx`.
+  export/      DOM-free PDF layout + PDFKit worker; client handles progress, cancellation and download.
   shared/      types and constants used by more than one layer.
 bench/         synthetic corpus generator and threshold report (Node scripts).
 ```
 
-- Dependencies point downward only: `app → worker client → (worker) → engine | parsers`. `engine` and `parsers` import nothing from `app` or `worker`.
+- Dependencies point downward only: `app → worker client → (worker) → engine | parsers`, and `app → export client → (PDF worker) → PDF layout`. `engine` and `parsers` import nothing from `app` or `worker`.
 - A module exports one clear thing. No barrel files that re-export whole directories; import from the file that owns the symbol.
 - Chapter detection is one function in `parsers/chapters.ts` used by every parser; never duplicated per format.
 - Thresholds, limits and tier names live in `shared/constants.ts` only.
@@ -51,14 +51,14 @@ bench/         synthetic corpus generator and threshold report (Node scripts).
 
 Add a dependency only when it replaces a meaningful amount of non-trivial code. Record it here.
 
-| Package          | Why                                  | Replacement considered                                   |
-| ---------------- | ------------------------------------ | -------------------------------------------------------- |
-| react, react-dom | UI (ADR 0003)                        | —                                                        |
-| mammoth          | `.docx` text extraction              | own OOXML reader (more code, less tested)                |
-| fflate           | unzip `.hwpx`; zip PNG export pieces | `DecompressionStream` (no ZIP central directory support) |
-| @rhwp/core       | `.hwp` (HWP 5) text, pinned exactly  | own CFB/record reader; hwp.js (unmaintained) — ADR 0005  |
-| html2canvas-pro  | PNG export (PDF uses browser print)  | jspdf (blank pages past the canvas height limit)         |
-| pretendard       | UI font                              | —                                                        |
+| Package          | Why                                 | Replacement considered                                                                                                 |
+| ---------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| react, react-dom | UI (ADR 0003)                       | —                                                                                                                      |
+| mammoth          | `.docx` text extraction             | own OOXML reader (more code, less tested)                                                                              |
+| fflate           | unzip `.hwpx`; PDFKit's deflate     | `DecompressionStream` (no ZIP central directory support)                                                               |
+| @rhwp/core       | `.hwp` (HWP 5) text, pinned exactly | own CFB/record reader; hwp.js (unmaintained) — ADR 0005                                                                |
+| pdfkit           | Report PDF in a worker (ADR 0007)   | jsPDF keeps every page in memory (1.9 GB peak RSS at 3,000 pages); browser print clipped content and varied by browser |
+| pretendard       | UI font; subset-embedded report TTF | —                                                                                                                      |
 
 Anything not listed here is not approved yet.
 

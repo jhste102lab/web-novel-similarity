@@ -123,6 +123,19 @@
 .slot:hover {
   border-color: var(--fg);
 }
+.slot .drop {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 6px;
+  fill: none;
+  stroke: var(--meta);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.slot.over .drop {
+  stroke: var(--fg);
+}
 .slot .name {
   font-size: 18px;
   font-weight: 700;
@@ -133,6 +146,13 @@
 .slot .fmt {
   color: var(--meta);
   font-size: 13px;
+}
+.slot.loading {
+  gap: 14px;
+  cursor: progress;
+}
+.slot.loading .bar {
+  width: 60%;
 }
 .slot.filled {
   border: 1.5px solid var(--border);

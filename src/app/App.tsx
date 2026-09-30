@@ -1,21 +1,27 @@
 import { useEffect, useMemo, useState } from 'react'
-import { contextOf } from '../export/context.ts'
-import { CompareReport, RepeatReport, type Amount } from '../export/Report.tsx'
+import { aroundOf, joinOf } from '../engine/context.ts'
+import { download, exportPdf, type Pdf } from '../export/exportPdf.ts'
+import type { PdfInput } from '../export/pdf.ts'
 import type { CompareResult, RepeatResult } from '../shared/types.ts'
+import { blocksOf, type JoinFn } from './blocks.ts'
 import { runInWorker, type Run } from '../worker/client.ts'
 import { AnalyzingScreen } from './AnalyzingScreen.tsx'
-import { ExportOverlay } from './ExportOverlay.tsx'
 import { Modal, type ModalProps } from './Modal.tsx'
 import { RepeatView } from './RepeatView.tsx'
 import { CompareView } from './CompareView.tsx'
 import {
+  chapterLabel,
   filterGroups,
   filterMatches,
-  groupKey,
-  matchKey,
-  searchGroups,
-  searchMatches,
+  groupSpan,
+  ordinal,
+  sortGroups,
+  sortMatches,
+  TIER_LABEL,
+  where,
   type CompareFilter,
+  type FileFn,
+  type Order,
   type RepeatFilter,
 } from './results.ts'
 import {
@@ -24,6 +30,7 @@ import {
   rangeLabel,
   RejectedFilesError,
   slotEngineText,
+  slotFileAt,
   slotBounds,
   type Slot,
 } from './slot.ts'
@@ -31,12 +38,18 @@ import { StartScreen, type SlotView } from './StartScreen.tsx'
 
 type Key = 'A' | 'B'
 
-/** What the report holds: the list as filtered and searched, its first N rows, or the ticked rows. */
-type Scope = 'view' | 'top' | 'picked'
-const TOP_N = [10, 50, 100]
-const AMOUNT_LABEL: Record<'compare' | 'repeat', Record<Amount, string>> = {
-  compare: { summary: '요약표만', part: '대조 일부', full: '대조 전부' },
-  repeat: { summary: '요약표만', part: '위치 일부', full: '위치 전부' },
+/** Pages drawn for the 내보내기 preview; saving builds the whole file. */
+const PREVIEW_PAGES = 30
+
+/** 내보내기: a preview of the first pages, then, once saving is confirmed, the whole file. */
+interface PdfJob {
+  input: PdfInput
+  preview: Run<Pdf>
+  /** Set once the preview is drawn. */
+  shown?: { pdf: Pdf; url: string }
+  /** The whole file being built after 저장 was confirmed. */
+  save?: { run: Run<Pdf>; page: number }
+  error?: string
 }
 
 type Screen =
@@ -57,7 +70,7 @@ type Screen =
 const REPO = 'https://github.com/jhste102lab/web-novel-similarity'
 
 export function App() {
-  const [two, setTwo] = useState(false)
+  const [two, setTwo] = useState(true)
   const [slots, setSlots] = useState<Record<Key, SlotView>>({
     A: { slot: null, error: null },
     B: { slot: null, error: null },
@@ -68,11 +81,8 @@ export function App() {
   const [repeatFilter, setRepeatFilter] = useState<RepeatFilter>('all')
   const [selected, setSelected] = useState(0)
   const [query, setQuery] = useState('')
-  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
-  const [exporting, setExporting] = useState(false)
-  const [scope, setScope] = useState<Scope>('view')
-  const [top, setTop] = useState(TOP_N[0]!)
-  const [amount, setAmount] = useState<Amount>('full')
+  const [order, setOrder] = useState<Order>('chapter')
+  const [pdf, setPdf] = useState<PdfJob | null>(null)
   const [runError, setRunError] = useState<string | null>(null)
 
   // Nothing is saved, so leaving the page (reload, close, back) loses the loaded files and
@@ -85,12 +95,23 @@ export function App() {
     return () => window.removeEventListener('beforeunload', ask)
   }, [unsaved])
 
+  // While dropped files are read, the pointer spins everywhere, not only over the card.
+  const reading = slots.A.loading !== undefined || slots.B.loading !== undefined
+  useEffect(() => {
+    document.documentElement.classList.toggle('busy', reading)
+  }, [reading])
+
   const setSlot = (key: Key, view: SlotView): void => setSlots((s) => ({ ...s, [key]: view }))
 
   const onFiles = async (key: Key, files: File[]): Promise<void> => {
     if (files.length === 0) return
+    const total = files.length
+    setSlot(key, { slot: null, error: null, loading: { done: 0, total } })
     try {
-      setSlot(key, { slot: await loadSlot(files), error: null })
+      const slot = await loadSlot(files, (done) =>
+        setSlot(key, { slot: null, error: null, loading: { done, total } }),
+      )
+      setSlot(key, { slot, error: null })
     } catch (err) {
       setSlot(key, { slot: null, error: fileError(err) })
     }
@@ -134,7 +155,6 @@ export function App() {
     setCompareFilter('all')
     setRepeatFilter('all')
     setQuery('')
-    setPicked(new Set())
     setSelected(0)
     setScreen({ kind: 'analyzing', run, pct: 0, two: b !== null })
     run.result.then(
@@ -180,46 +200,81 @@ export function App() {
 
   const results = screen.kind === 'results' ? screen : null
 
-  // Report rows for the chosen scope; worked out only while the export overlay is open.
-  const report = useMemo(() => {
-    if (!exporting || !results) return null
-    const r = results.result
-    const choose = <T,>(all: T[], view: T[], key: (row: T) => string) => ({
-      // Findings before the MAX_RESULTS cap, so a capped report does not read as complete.
-      total: r.total,
-      view: view.length,
-      rows:
-        scope === 'picked'
-          ? all.filter((row) => picked.has(key(row)))
-          : scope === 'top'
-            ? view.slice(0, top)
-            : view,
-    })
-    return r.kind === 'compare'
-      ? {
-          kind: 'compare' as const,
-          ...choose(
-            r.matches,
-            searchMatches(filterMatches(r.matches, compareFilter), query),
-            matchKey,
-          ),
-        }
-      : {
-          kind: 'repeat' as const,
-          ...choose(r.groups, searchGroups(filterGroups(r.groups, repeatFilter), query), groupKey),
-        }
-  }, [exporting, results, scope, top, picked, compareFilter, repeatFilter, query])
-  // Indexing the manuscript again takes a moment on a long one, so it is done once per overlay.
-  const resultA = results?.result.kind === 'repeat' ? results.a : null
-  const context = useMemo(
-    () => (exporting && resultA ? contextOf(slotEngineText(resultA)) : null),
-    [exporting, resultA],
-  )
+  // Findings carry offsets into the text the search ran on; the same slot builds the same text.
+  const slotA = results?.a ?? null
+  const slotB = results?.b ?? null
+  const textA = useMemo(() => (slotA ? slotEngineText(slotA) : null), [slotA])
+  const textB = useMemo(() => (slotB ? slotEngineText(slotB) : null), [slotB])
+  const aroundA = useMemo(() => (textA ? aroundOf(textA) : null), [textA])
+  const joinA = useMemo(() => (textA ? joinOf(textA) : null), [textA])
+  const joinB = useMemo(() => (textB ? joinOf(textB) : null), [textB])
+  const fileA = useMemo(() => (slotA ? slotFileAt(slotA) : null), [slotA])
+  const fileB = useMemo(() => (slotB ? slotFileAt(slotB) : null), [slotB])
 
-  const openExport = (): void => {
-    // Ticked rows are what the user most likely wants to export.
-    setScope((s) => (picked.size > 0 ? 'picked' : s === 'picked' ? 'view' : s))
-    setExporting(true)
+  // The report holds the active tab's findings (search ignored), in the order the list shows.
+  // 내보내기 opens a preview of its first pages; saving asks, then builds the whole file.
+  const startPdf = (): void => {
+    if (!results || !joinA || !fileA) return
+    const input = pdfInput(
+      results,
+      order,
+      { compare: compareFilter, repeat: repeatFilter },
+      joinA,
+      joinB,
+      fileA,
+      fileB,
+    )
+    const preview = exportPdf(input, () => {}, PREVIEW_PAGES)
+    setPdf({ input, preview })
+    preview.result.then(
+      (p) =>
+        setPdf((j) =>
+          j?.preview === preview
+            ? { ...j, shown: { pdf: p, url: URL.createObjectURL(p.blob) } }
+            : j,
+        ),
+      (err: unknown) => {
+        if (preview.aborted) return
+        setPdf((j) => (j?.preview === preview ? { ...j, error: String(err) } : j))
+      },
+    )
+  }
+  const closePdf = (): void => {
+    pdf?.preview.abort()
+    pdf?.save?.run.abort()
+    if (pdf?.shown) URL.revokeObjectURL(pdf.shown.url)
+    setPdf(null)
+  }
+  const savePdf = (): void => {
+    const job = pdf
+    if (!job?.shown || !results) return
+    const { pdf: shown, url } = job.shown
+    // 작품명_유사도검사_20260930_171530.pdf, named after A and the moment 저장 was asked.
+    const pdfName = `${results.a.title.trim() || '원고'}_유사도검사_${stamp()}.pdf`
+    confirm('PDF로 저장할까요?', `${pdfName} · ${shown.pages.toLocaleString()}쪽`, () => {
+      const finish = (blob: Blob): void => {
+        download(blob, pdfName)
+        URL.revokeObjectURL(url)
+        setPdf((j) => (j?.preview === job.preview ? null : j))
+      }
+      // The preview already is the whole report.
+      if (shown.pages <= PREVIEW_PAGES) return finish(shown.blob)
+      const run = exportPdf(job.input, (page) =>
+        setPdf((j) => (j?.save?.run === run ? { ...j, save: { run, page } } : j)),
+      )
+      setPdf((j) => (j?.preview === job.preview ? { ...j, save: { run, page: 0 } } : j))
+      run.result.then(
+        (p) => finish(p.blob),
+        (err: unknown) => {
+          if (run.aborted) return
+          setPdf((j) => (j?.save?.run === run ? { ...j, save: undefined, error: String(err) } : j))
+        },
+      )
+    })
+  }
+  const stopSave = (): void => {
+    pdf?.save?.run.abort()
+    setPdf((j) => (j ? { ...j, save: undefined } : j))
   }
 
   const listProps = {
@@ -230,8 +285,11 @@ export function App() {
     },
     selected,
     onSelect: setSelected,
-    picked,
-    onPick: setPicked,
+    order,
+    onOrder: (o: Order): void => {
+      setOrder(o)
+      setSelected(0)
+    },
   }
 
   return (
@@ -269,7 +327,7 @@ export function App() {
               >
                 새로 비교
               </button>
-              <button className="btn primary" onClick={openExport}>
+              <button className="btn primary" onClick={startPdf} disabled={pdf !== null}>
                 내보내기
               </button>
             </>
@@ -319,6 +377,10 @@ export function App() {
             titleA={results.a.title}
             titleB={results.b?.title ?? ''}
             rangeNote={rangeNote(results.a, results.b)}
+            joinA={joinA!}
+            joinB={joinB!}
+            fileA={fileA!}
+            fileB={fileB!}
             running={results.run !== null}
             stopped={results.stopped ?? false}
             filter={compareFilter}
@@ -333,6 +395,7 @@ export function App() {
           <RepeatView
             result={results.result}
             titleA={results.a.title}
+            around={aroundA!}
             running={results.run !== null}
             stopped={results.stopped ?? false}
             filter={repeatFilter}
@@ -344,82 +407,57 @@ export function App() {
           />
         )}
       </main>
-      {modal && <Modal {...modal} onNo={() => setModal(null)} />}
-      {report && results && (
-        <ExportOverlay
-          fileName={`유사도 검사 ${today()}`}
-          onClose={() => setExporting(false)}
-          options={
-            <>
-              <span className="opt">
-                범위
-                <span className="seg">
-                  <button className={scope === 'view' ? 'on' : ''} onClick={() => setScope('view')}>
-                    지금 목록 {report.view.toLocaleString()}개
-                  </button>
-                  {/* A div, not a button: a select inside a button does not open in every browser. */}
-                  <div className={scope === 'top' ? 'on' : ''} onClick={() => setScope('top')}>
-                    상위
-                    <select value={top} onChange={(e) => setTop(Number(e.target.value))}>
-                      {TOP_N.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    개
-                  </div>
-                  <button
-                    className={scope === 'picked' ? 'on' : ''}
-                    disabled={picked.size === 0}
-                    onClick={() => setScope('picked')}
-                  >
-                    선택한 {picked.size.toLocaleString()}개
-                  </button>
+      {pdf && (
+        <div className="ov">
+          <div className="panel">
+            <div className="ph">
+              <h2>내보내기</h2>
+              {pdf.shown && (
+                <span className="est">
+                  전체 {pdf.shown.pdf.pages.toLocaleString()}쪽
+                  {pdf.shown.pdf.pages > PREVIEW_PAGES && ` · 앞 ${PREVIEW_PAGES}쪽 미리보기`}
                 </span>
-              </span>
-              <span className="opt">
-                분량
-                <span className="seg">
-                  {(['summary', 'part', 'full'] as const).map((a) => (
-                    <button
-                      key={a}
-                      className={amount === a ? 'on' : ''}
-                      onClick={() => setAmount(a)}
-                    >
-                      {AMOUNT_LABEL[report.kind][a]}
-                    </button>
-                  ))}
-                </span>
-              </span>
-            </>
-          }
-        >
-          {report.kind === 'compare' ? (
-            <CompareReport
-              meta={{
-                date: today(),
-                a: manuscriptLine(results.a),
-                b: results.b ? manuscriptLine(results.b) : undefined,
-                scope: scopeLine(report.rows.length, report.total),
-              }}
-              rows={report.rows}
-              amount={amount}
-            />
-          ) : (
-            <RepeatReport
-              meta={{
-                date: today(),
-                a: manuscriptLine(results.a),
-                scope: scopeLine(report.rows.length, report.total),
-              }}
-              rows={report.rows}
-              amount={amount}
-              context={context!}
-            />
-          )}
-        </ExportOverlay>
+              )}
+              {pdf.save ? (
+                <>
+                  <span className="saving">
+                    PDF 만드는 중 {pdf.save.page.toLocaleString()} /{' '}
+                    {pdf.shown?.pdf.pages.toLocaleString()}쪽
+                    <span className="bar">
+                      <i
+                        style={{
+                          width: `${(pdf.save.page / (pdf.shown?.pdf.pages ?? 1)) * 100}%`,
+                        }}
+                      />
+                    </span>
+                  </span>
+                  <button className="btn" onClick={stopSave}>
+                    취소
+                  </button>
+                </>
+              ) : (
+                <button className="btn primary" onClick={savePdf} disabled={!pdf.shown}>
+                  PDF로 저장
+                </button>
+              )}
+              <button className="x" onClick={closePdf}>
+                ×
+              </button>
+            </div>
+            {pdf.error ? (
+              <div className="wait">PDF를 만들지 못했어요. {pdf.error}</div>
+            ) : pdf.shown ? (
+              <iframe title="PDF 미리보기" src={pdf.shown.url} />
+            ) : (
+              <div className="wait">
+                <i className="spinner" />
+                미리보기를 만드는 중
+              </div>
+            )}
+          </div>
+        </div>
       )}
+      {modal && <Modal {...modal} onNo={() => setModal(null)} />}
     </>
   )
 }
@@ -448,16 +486,86 @@ function manuscriptLine(s: Slot): string {
   return b === null ? s.title : `${s.title} · ${b[0] === 1 ? '' : `${b[0]}~`}${b[1]}화`
 }
 
-/** Report line saying how much of the result it holds. */
-function scopeLine(n: number, total: number): string {
-  return n === total
-    ? `전체 ${total.toLocaleString()}개`
-    : `${total.toLocaleString()}개 중 ${n.toLocaleString()}개`
+/** Report data: the findings of the active tab (search ignored) in list order, with context. */
+function pdfInput(
+  r: { result: CompareResult | RepeatResult; a: Slot; b: Slot | null; stopped?: boolean },
+  order: Order,
+  filter: { compare: CompareFilter; repeat: RepeatFilter },
+  joinA: JoinFn,
+  joinB: JoinFn | null,
+  fileA: FileFn,
+  fileB: FileFn | null,
+): PdfInput {
+  const manuscripts = [
+    { key: 'A' as const, title: manuscriptLine(r.a), files: r.a.files },
+    ...(r.b ? [{ key: 'B' as const, title: manuscriptLine(r.b), files: r.b.files }] : []),
+  ]
+  const stopped: [string, string][] = r.stopped ? [['참고', '중단됨 · 검사한 곳까지의 결과']] : []
+  const common = { date: today(), manuscripts }
+  if (r.result.kind === 'compare') {
+    const m = r.result.matches
+    const jb = joinB ?? joinA
+    const fb = fileB ?? fileA
+    return {
+      ...common,
+      kind: 'compare',
+      heading: '유사도 검사 결과',
+      facts: [
+        [
+          '결과',
+          `회차 쌍 ${m.length.toLocaleString()}개 · 거의 동일 ${filterMatches(m, 'near').length.toLocaleString()}개 · 일부 수정 ${filterMatches(m, 'edited').length.toLocaleString()}개`,
+        ],
+        ['담은 결과', filter.compare === 'all' ? '전체' : `${TIER_LABEL[filter.compare]}만`],
+        ['정렬', order === 'chapter' ? '회차순' : '유사도순'],
+        ...stopped,
+      ],
+      rows: sortMatches(filterMatches(m, filter.compare), order).map((x) => {
+        const first = x.passages[0]!
+        return {
+          a: `${fileA(first.a.start)} · ${chapterLabel(x.a)}`,
+          b: `${fb(first.b.start)} · ${chapterLabel(x.b)}`,
+          tier: x.tier,
+          blocks: blocksOf(x.passages, joinA, jb, fileA, fb),
+        }
+      }),
+    }
+  }
+  const g = r.result.groups
+  return {
+    ...common,
+    kind: 'repeat',
+    heading: '내부 반복 검사 결과',
+    facts: [
+      [
+        '결과',
+        `반복 문장 ${g.length.toLocaleString()}개 · 3회 이상 ${filterGroups(g, 3).length.toLocaleString()}개 · 5회 이상 ${filterGroups(g, 5).length.toLocaleString()}개`,
+      ],
+      ['담은 결과', filter.repeat === 'all' ? '전체' : `${filter.repeat}회 이상만`],
+      ['정렬', order === 'chapter' ? '회차순' : '반복 많은 순'],
+      ...stopped,
+    ],
+    rows: sortGroups(filterGroups(g, filter.repeat), order).map((x) => ({
+      title: `${x.occurrences.length}회 · ${groupSpan(x)}`,
+      places: x.occurrences.map((o) => ({
+        label: o.chapter === null ? where(o) : `${where(o)} · ${ordinal(o)}`,
+        pieces: joinA([o])[0]!.pieces.map((p) =>
+          p.span === undefined ? { text: p.text } : { text: p.text, other: null },
+        ),
+      })),
+    })),
+  }
 }
 
 function today(): string {
   const d = new Date()
   return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`
+}
+
+/** "20260930_171530", local time. */
+function stamp(): string {
+  const d = new Date()
+  const two = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`
 }
 
 function GithubIcon() {

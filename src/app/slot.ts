@@ -1,5 +1,6 @@
 import {
   buildManuscript,
+  engineOrder,
   toEngineText,
   type Manuscript,
   type ParsedFile,
@@ -12,6 +13,8 @@ import type { ChapterRange, ManuscriptText } from '../shared/types.ts'
 export interface Slot {
   manuscript: Manuscript
   title: string
+  /** Names of the dropped files, in reading order; the report lists them. */
+  files: string[]
   labels: (number | null)[]
   /** null = whole manuscript, or when it has no chapters. */
   range: ChapterRange | null
@@ -37,11 +40,31 @@ export class FileReadError extends Error {
   }
 }
 
-/** Parses dropped/selected files into a slot. Rejects the whole drop when any file is unsupported. */
-export async function loadSlot(files: File[]): Promise<Slot> {
+/** Lets the browser paint (progress, spinner) before more parsing blocks the main thread. */
+function frame(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>()
+  requestAnimationFrame(() => setTimeout(resolve, 0))
+  return promise
+}
+
+/**
+ * Parses dropped/selected files into a slot. Rejects the whole drop when any file is unsupported.
+ * `onProgress` gets the files read so far, at most every 50 ms.
+ */
+export async function loadSlot(
+  files: File[],
+  onProgress: (done: number) => void = () => {},
+): Promise<Slot> {
   const parsed: ParsedFile[] = []
   const rejected: string[] = []
-  for (const f of files) {
+  await frame()
+  let painted = performance.now()
+  for (const [i, f] of files.entries()) {
+    if (performance.now() - painted > 50) {
+      onProgress(i)
+      await frame()
+      painted = performance.now()
+    }
     try {
       parsed.push({
         name: f.name,
@@ -53,11 +76,14 @@ export async function loadSlot(files: File[]): Promise<Slot> {
       else throw new FileReadError(f.name, err)
     }
   }
+  onProgress(files.length)
+  await frame()
   if (rejected.length > 0) throw new RejectedFilesError(rejected)
   const manuscript = buildManuscript(parsed)
   return {
     manuscript,
     title: manuscript.title,
+    files: files.map((f) => f.name).sort(new Intl.Collator('ko', { numeric: true }).compare),
     labels: manuscript.parts.map((p) => p.label),
     range: null,
   }
@@ -75,6 +101,26 @@ export function slotEngineText(slot: Slot): ManuscriptText {
     ...slot.manuscript,
     parts: slot.manuscript.parts.map((p, i) => ({ ...p, label: slot.labels[i] ?? null })),
   })
+}
+
+/** The file an offset of `slotEngineText(slot)` came from, for the report. */
+export function slotFileAt(slot: Slot): (pos: number) => string {
+  const parts = engineOrder(
+    slot.manuscript.parts.map((p, i) => ({ ...p, label: slot.labels[i] ?? null })),
+  )
+  const ends: number[] = []
+  let end = 0
+  for (const p of parts) ends.push((end += p.text.length + 2)) // toEngineText joins with '\n\n'
+  return (pos) => {
+    let lo = 0
+    let hi = ends.length - 1
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (ends[mid]! <= pos) lo = mid + 1
+      else hi = mid
+    }
+    return parts[lo]?.file ?? ''
+  }
 }
 
 function totalChars(slot: Slot): number {

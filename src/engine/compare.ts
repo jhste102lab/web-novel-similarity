@@ -1,6 +1,5 @@
 import {
   MAX_PASSAGES_PER_MATCH,
-  MAX_RESULTS,
   PARTIAL_EVERY_MS,
   PROGRESS_EVERY,
   TIER_EDITED,
@@ -174,8 +173,7 @@ function buildResult(
   list.sort((x, y) => y.near - x.near || y.count - x.count || (x.a ?? 0) - (y.a ?? 0))
   return {
     kind: 'compare',
-    total: list.length,
-    matches: list.slice(0, MAX_RESULTS).map((g) => toMatch(g, idxA, idxB)),
+    matches: list.map((g) => toMatch(g, idxA, idxB)),
     stats: { ...stats },
   }
 }
@@ -246,5 +244,7 @@ function span(idx: SentenceIndex, from: number, to: number): Passage['a'] {
     chapter: c < 0 ? null : c,
     sentenceIndex: idx.ordinal[from]!,
     text: idx.text.slice(idx.starts[from], idx.ends[to]).trim(),
+    start: idx.starts[from]!,
+    end: idx.ends[to]!,
   }
 }
