@@ -183,8 +183,10 @@ export function App() {
   // Report rows for the chosen scope; worked out only while the export overlay is open.
   const report = useMemo(() => {
     if (!exporting || !results) return null
+    const r = results.result
     const choose = <T,>(all: T[], view: T[], key: (row: T) => string) => ({
-      total: all.length,
+      // Findings before the MAX_RESULTS cap, so a capped report does not read as complete.
+      total: r.total,
       view: view.length,
       rows:
         scope === 'picked'
@@ -193,7 +195,6 @@ export function App() {
             ? view.slice(0, top)
             : view,
     })
-    const r = results.result
     return r.kind === 'compare'
       ? {
           kind: 'compare' as const,

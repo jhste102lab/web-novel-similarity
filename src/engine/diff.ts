@@ -34,11 +34,26 @@ function anchoredDiff(a: string, b: string): DiffOp[] {
   let gapA = ''
   let gapB = ''
   const flush = (): void => {
-    if (gapA.length * gapB.length <= MAX_CELLS) lcsDiff(gapA, gapB).forEach(push)
+    // A stretch without sentence ends can still be too long for the table; its shared start
+    // and end are kept, and only what lies between is given up as one change.
+    let p = 0
+    while (p < gapA.length && p < gapB.length && gapA[p] === gapB[p]) p++
+    let q = 0
+    while (
+      q < gapA.length - p &&
+      q < gapB.length - p &&
+      gapA[gapA.length - 1 - q] === gapB[gapB.length - 1 - q]
+    )
+      q++
+    const midA = gapA.slice(p, gapA.length - q)
+    const midB = gapB.slice(p, gapB.length - q)
+    push({ op: 'eq', text: gapA.slice(0, p) })
+    if (midA.length * midB.length <= MAX_CELLS) lcsDiff(midA, midB).forEach(push)
     else {
-      push({ op: 'del', text: gapA })
-      push({ op: 'ins', text: gapB })
+      push({ op: 'del', text: midA })
+      push({ op: 'ins', text: midB })
     }
+    push({ op: 'eq', text: gapA.slice(gapA.length - q) })
     gapA = ''
     gapB = ''
   }

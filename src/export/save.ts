@@ -13,12 +13,30 @@ const PRINT_WIDTH = 688
 // matched Chrome's page count on docs/samples within ~10 %. Only shown as "약 N쪽".
 const PRINT_PAGE_H = 920
 
-/** One top-level report element, or a row cut down to some of its children. */
+/** One top-level report element, or a row (or table) cut down to some of its children (rows). */
 type Part = { el: Element; children?: Element[] }
 
 function outerHeight(el: Element): number {
   const cs = getComputedStyle(el)
   return el.getBoundingClientRect().height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom)
+}
+
+/** What a too-tall element is split by: a table by its body rows, anything else by its children. */
+function splitUnits(el: Element): Element[] {
+  return el instanceof HTMLTableElement ? [...(el.tBodies[0]?.rows ?? [])] : [...el.children]
+}
+
+/** A copy of `el` holding only `children`; a table keeps its header row in every piece. */
+function shell(el: Element, children: Element[]): Element {
+  const copy = el.cloneNode(false) as Element
+  const kids = children.map((c) => c.cloneNode(true))
+  if (el instanceof HTMLTableElement) {
+    if (el.tHead) copy.append(el.tHead.cloneNode(true))
+    const body = el.tBodies[0]!.cloneNode(false) as HTMLTableSectionElement
+    body.append(...kids)
+    copy.append(body)
+  } else copy.append(...kids)
+  return copy
 }
 
 /** Report elements grouped into PNG pieces; a row taller than a piece is split by its children. */
@@ -35,7 +53,7 @@ export function pngPieces(node: HTMLElement): Part[][] {
   }
   for (const el of node.children) {
     const eh = outerHeight(el)
-    if (eh <= PIECE_H || el.children.length < 2) {
+    if (eh <= PIECE_H || splitUnits(el).length < 2) {
       add({ el }, eh)
       continue
     }
@@ -43,7 +61,7 @@ export function pngPieces(node: HTMLElement): Part[][] {
     let room = PIECE_H - h
     let children: Element[] = []
     let ch = 0
-    for (const c of el.children) {
+    for (const c of splitUnits(el)) {
       const cz = outerHeight(c)
       if (ch + cz > room && children.length > 0) {
         add({ el, children }, ch)
@@ -101,14 +119,8 @@ export async function savePng(node: HTMLElement, name: string): Promise<void> {
     const box = document.createElement('div')
     box.className = 'rp png-piece'
     box.style.width = `${node.clientWidth}px`
-    for (const { el, children } of piece) {
-      if (!children) box.append(el.cloneNode(true))
-      else {
-        const shell = el.cloneNode(false) as Element
-        shell.append(...children.map((c) => c.cloneNode(true)))
-        box.append(shell)
-      }
-    }
+    for (const { el, children } of piece)
+      box.append(children ? shell(el, children) : el.cloneNode(true))
     splitMarks(box)
     document.body.append(box)
     try {

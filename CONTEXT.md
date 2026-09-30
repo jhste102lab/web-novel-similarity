@@ -127,7 +127,7 @@ Review (2026-09-30 #2, export scope; decided on an HTML mockup):
 - A repeat's detail lists 100 places and then `외 N곳 더 보기`.
 - The report has no coloured side bar; tier dots and marks print in colour.
 - The HWP 5 reader is fetched right after the page loads and precached for
-  offline use, so the first HWP file does not wait for it (ADR 0006).
+  offline use, so the first HWP file rarely waits for it (ADR 0006).
 
 ## Open decisions
 

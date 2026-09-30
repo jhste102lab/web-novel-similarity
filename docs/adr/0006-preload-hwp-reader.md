@@ -29,5 +29,7 @@ first HWP load, whatever it costs. The whole app is otherwise ~104 kB gzipped.
 
 - Every visit costs 3.7 MB of transfer on the first load (then cached) and the
   memory of one compiled WASM module.
+- A file dropped before the preload finishes still waits for the remainder
+  (same in-flight promise); on a slow line that can be seconds.
 - Parsing time is unchanged; it stays on the main thread (ADR 0005).
 - Still no request besides the site's own files (ADR 0001 unchanged).

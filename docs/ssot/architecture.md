@@ -192,10 +192,10 @@ the "nothing is uploaded" claim.
 The overlay picks what goes in (**범위**) and how much of each row (**분량**); rows come from `App.tsx`:
 
 - 범위: 지금 목록 (tab + search, as on screen), 상위 10/50/100 of that list, or 선택한 N개 (ticked rows, whatever the tab). Opening the overlay with ticked rows selects 선택한 N개.
-- 분량: 요약표만 (one table row per finding), 일부 (compare: the first 3 sentences of each passage, repeat: the first 3 places, then `… 외 N`), 전부 (default). Repeat places show the sentence before and after in the same 회차 (`src/export/context.ts` re-indexes the searched text and looks occurrences up by `id`).
+- 분량: 요약표만 (one table row per finding), 일부 (compare: the first 3 sentences of each passage, repeat: the first 3 places, then `… 외 N`), 전부 (default). Repeat places show the sentence before and after within the same chapter segment, short ones included (`src/export/context.ts` re-indexes the searched text, finds the occurrence by `id`, and reads the neighbours from the raw text). The report's 범위 line counts against the uncapped `total`.
 - The header shows `A4 약 N쪽`: the report cloned at the A4 text width (688 px) divided by 920 px, a figure calibrated against Chrome's PDF of `docs/samples`.
 - **PDF**: `window.print()` with `@media print` rules in `src/app/styles/export.css`. The report keeps selectable text and the browser paginates it. The print rules undo the overlay's scroll box and height cap (with them the printout stopped after one screenful), print two-column blocks as tables so every browser can split them across pages, and keep colours (`print-color-adjust: exact`).
-- **PNG**: `html2canvas-pro` at 2×. A report taller than one canvas (`MAX_CANVAS_SIDE`, 16,000 px) is cut into pieces of whole rows (a longer row is split between its children), each rendered from a clone outside the overlay and zipped with fflate (stored, not deflated). Marks are split per word in the clones and words kept whole: html2canvas paints a mark that wraps as one box over both lines.
+- **PNG**: `html2canvas-pro` at 2×. A report taller than one canvas (`MAX_CANVAS_SIDE`, 16,000 px) is cut into pieces of whole rows (a longer row is split between its children, a summary table between its rows with the header repeated), each rendered from a clone outside the overlay and zipped with fflate (stored, not deflated). Marks are split per word in the clones and words kept whole: html2canvas paints a mark that wraps as one box over both lines.
 
 ## Build and deploy
 

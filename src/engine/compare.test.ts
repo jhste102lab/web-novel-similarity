@@ -142,4 +142,11 @@ describe('charDiff', () => {
       '빠르게',
     ])
   })
+
+  it('keeps the shared text of a long stretch without sentence ends', () => {
+    const a = '가나다라마바사 '.repeat(80)
+    const b = a.slice(0, 300) + '뭐' + a.slice(301)
+    const d = charDiff(a, b)
+    expect(d.filter((o) => o.op !== 'eq').map((o) => o.text)).toEqual([a[300], '뭐'])
+  })
 })

@@ -22,8 +22,8 @@ function loadRhwp(): Promise<typeof Rhwp> {
 }
 
 /**
- * Fetches and compiles the reader (~3.7 MB gzipped WASM) right after the page has loaded, so
- * the first HWP 5 file does not wait for it (ADR 0006). A failure is retried when a file needs it.
+ * Fetches and compiles the reader (~3.7 MB gzipped WASM) right after the page has loaded; a
+ * file dropped before that finishes waits only for the rest (ADR 0006). Failures are retried.
  */
 export function preloadHwp(): void {
   loadRhwp().catch(() => {})
