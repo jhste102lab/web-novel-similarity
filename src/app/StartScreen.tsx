@@ -46,7 +46,7 @@ export function StartScreen({
           slotKey="A"
           slot={a.slot}
           error={a.error}
-          hint="txt · docx · hwpx"
+          hint="txt · docx · hwp · hwpx"
           onFiles={(f) => onFiles('A', f)}
           onChange={(s) => onChange('A', s)}
           onClear={() => onClear('A')}
@@ -62,7 +62,7 @@ export function StartScreen({
               slotKey="B"
               slot={b.slot}
               error={b.error}
-              hint="txt · docx · hwpx"
+              hint="txt · docx · hwp · hwpx"
               onFiles={(f) => onFiles('B', f)}
               onChange={(s) => onChange('B', s)}
               onClear={() => onClear('B')}

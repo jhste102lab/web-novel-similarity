@@ -21,6 +21,7 @@
     "bench": "node bench/run.ts"
   },
   "dependencies": {
+    "@rhwp/core": "0.8.6",
     "fflate": "^0.8.2",
     "html2canvas-pro": "^1.5.11",
     "mammoth": "^1.12.0",

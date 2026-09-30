@@ -1,7 +1,7 @@
 # 0003 — React/Vite, GitHub Pages, MIT
 
 Status: Accepted (2026-09-21), amended during implementation (2026-09-21) —
-see _Amendments_.
+see _Amendments_. HWP 5 parsing added by ADR 0005 (2026-09-30).
 
 ## Context
 
