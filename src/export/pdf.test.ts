@@ -15,11 +15,9 @@ function recorder() {
   return { canvas, texts, pages: () => pages }
 }
 
-const side = (text: string) => ({
-  label: '1화 · 1번째 문장',
-  before: '앞 문장이다.',
-  text,
-  after: '뒤 문장이다.',
+const side = (text: string, label = '1화 · 1번째 문장') => ({
+  label,
+  pieces: [{ text: '앞 문장이다.\n' }, { text, other: text }, { text: '\n뒤 문장이다.' }],
 })
 
 describe('renderPdf', () => {
@@ -39,7 +37,7 @@ describe('renderPdf', () => {
           a: 'a.txt · 1화',
           b: 'b.txt · 1화',
           tier: 'near',
-          passages: [{ a: side(long), b: side(long) }],
+          blocks: [{ a: [side(long)], b: [side(long), side('겹친다.', '1화 · 9번째 문장')] }],
         },
       ],
     }
@@ -50,6 +48,13 @@ describe('renderPdf', () => {
     const footers = r.texts.filter((t) => / \/ \d+$/.test(t.t)).map((t) => t.t)
     expect(footers).toEqual(Array.from({ length: pages }, (_, i) => `${i + 1} / ${pages}`))
     expect(r.texts.filter((t) => t.t.endsWith('(계속)'))).toHaveLength(pages - 1)
+    // A second B stretch in the same block gets its own label under the first one.
+    const labels = r.texts.filter((t) => t.t.endsWith('번째 문장'))
+    expect(labels.map((t) => t.t)).toEqual([
+      '1화 · 1번째 문장',
+      '1화 · 1번째 문장',
+      '1화 · 9번째 문장',
+    ])
     // Nothing runs past the right margin (A4 width minus 40 pt) or into the footer rule.
     for (const t of r.texts) {
       expect(t.x + [...t.t].length * 0.6 * t.size).toBeLessThanOrEqual(595.28 - 40 + 0.01)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ManuscriptText } from '../shared/types.ts'
 import { compare } from './compare.ts'
-import { aroundOf } from './context.ts'
+import { aroundOf, joinOf } from './context.ts'
 import { charDiff } from './diff.ts'
 import { boundedEditDistance } from './editDistance.ts'
 import { findRepeats } from './repeats.ts'
@@ -118,6 +118,30 @@ describe('findRepeats', () => {
         after: '',
       },
     ])
+  })
+})
+
+describe('joinOf', () => {
+  it('shows findings with overlapping neighbours once, in reading order', () => {
+    const lines = Array.from({ length: 20 }, (_, i) => `${i}번째 줄이다.`)
+    const m = doc([lines])
+    const at = (i: number) => {
+      const start = m.text.indexOf(`\n${lines[i]}`) + 1
+      return { start, end: start + lines[i]!.length }
+    }
+    const [near, far] = joinOf(m)([at(5), at(3), at(16)])
+    expect(near).toEqual({
+      spans: [1, 0],
+      pieces: [
+        { text: '#1화\n0번째 줄이다.\n1번째 줄이다.\n2번째 줄이다.\n' },
+        { text: '3번째 줄이다.', span: 1 },
+        { text: '\n4번째 줄이다.\n' },
+        { text: '5번째 줄이다.', span: 0 },
+        { text: '\n6번째 줄이다.\n7번째 줄이다.\n8번째 줄이다.\n9번째 줄이다.' },
+      ],
+    })
+    expect(far!.spans).toEqual([2])
+    expect(far!.pieces.map((p) => p.text).join('')).toBe(lines.slice(12, 20).join('\n'))
   })
 })
 

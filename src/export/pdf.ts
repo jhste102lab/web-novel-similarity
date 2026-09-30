@@ -1,4 +1,3 @@
-import type { Around } from '../engine/context.ts'
 import { charDiff } from '../engine/diff.ts'
 import type { Tier } from '../shared/types.ts'
 
@@ -9,16 +8,27 @@ export interface PdfManuscript {
   title: string
   files: string[]
 }
-/** One side of a finding: "원본.txt · 12화 · 3번째 문장" and the text with its neighbours. */
-export interface PdfSide extends Around {
+/** Grey context, or a finding: marked where it shares text with `other`, all of it when null. */
+export interface PdfPiece {
+  text: string
+  other?: string | null
+}
+/** One column: "원본.txt · 12화 · 3·5번째 문장" and its text in reading order. */
+export interface PdfSide {
   label: string
+  pieces: PdfPiece[]
+}
+/** Stretches of one chapter pair linked by findings; each text in it appears once. */
+export interface PdfBlock {
+  a: PdfSide[]
+  b: PdfSide[]
 }
 export interface PdfMatch {
   /** "원본.txt · 12화", one per side. */
   a: string
   b: string
   tier: Tier
-  passages: { a: PdfSide; b: PdfSide }[]
+  blocks: PdfBlock[]
 }
 export interface PdfGroup {
   /** "6회 · 27화~39화" */
@@ -306,12 +316,13 @@ class Layout {
   }
 }
 
-function runs(side: Around, mid: Run[]): Run[] {
-  return [
-    ...(side.before ? [{ text: side.before, style: 'ctx' as const }] : []),
-    ...mid,
-    ...(side.after ? [{ text: side.after, style: 'ctx' as const }] : []),
-  ]
+/** A column's pieces as runs; a finding compared with its match reads A-to-B either way. */
+function pieceRuns(side: PdfSide, key: Key): Run[] {
+  return side.pieces.flatMap((p): Run[] => {
+    if (p.other === undefined) return [{ text: p.text, style: 'ctx' }]
+    if (p.other === null) return [{ text: p.text, style: 'eq' }]
+    return key === 'A' ? diffRuns(p.text, p.other, 'a') : diffRuns(p.other, p.text, 'b')
+  })
 }
 
 /** One side of a diff as runs: text both sides share is 'eq' (marked), this side's own is 'own'. */
@@ -365,15 +376,27 @@ function cover(l: Layout, input: PdfInput): void {
   l.y += 20
 }
 
-/** Two tinted columns of a passage; split over pages, the chip and label row only on top. */
-function passage(
+/** A column row: a wrapped line, or the chip and label of a further stretch. */
+type Item = Line | { label: string }
+
+/** Stacked stretches of one column; each after the first opens with a blank row and its label. */
+function column(l: Layout, sides: PdfSide[], key: Key): Item[] {
+  const out: Item[] = []
+  for (const [i, s] of sides.entries()) {
+    if (i > 0) out.push([], { label: s.label })
+    out.push(...l.wrap(pieceRuns(s, key), COL - PAD * 2, BODY))
+  }
+  return out
+}
+
+/** Two tinted columns of a block; split over pages, the top chip and label row only on top. */
+function block(
   l: Layout,
-  p: { a: PdfSide; b: PdfSide },
-  a: Line[],
-  b: Line[],
+  labels: Record<Key, string>,
+  items: Record<Key, Item[]>,
   again: () => void,
 ): void {
-  const rows = Math.max(a.length, b.length)
+  const rows = Math.max(items.A.length, items.B.length)
   let i = 0
   while (i < rows) {
     const head = i === 0 ? HEAD : 0
@@ -381,24 +404,27 @@ function passage(
     const n = Math.min(rows - i, Math.floor((BOTTOM - l.y - PAD * 2 - head) / LINE))
     const h = PAD * 2 + head + n * LINE
     const top = l.y
-    for (const [key, x, side, lines] of [
-      ['A', LEFT, p.a, a],
-      ['B', LEFT + COL + GAP, p.b, b],
+    for (const [key, x] of [
+      ['A', LEFT],
+      ['B', LEFT + COL + GAP],
     ] as const) {
       l.c?.rect(x, top, COL, h, SIDE[key].bg)
-      if (head) {
-        l.chip(key, x + PAD, top + PAD)
+      const label = (text: string, y: number): void => {
+        l.chip(key, x + PAD, y)
         l.c?.text(
-          l.fit(side.label, COL - PAD * 2 - 18, SMALL),
+          l.fit(text, COL - PAD * 2 - 18, SMALL),
           x + PAD + 18,
-          top + PAD + 9.5,
+          y + 9.5,
           SMALL,
           SIDE[key].ink,
         )
       }
+      if (head) label(labels[key], top + PAD)
       for (let k = 0; k < n; k++) {
-        const line = lines[i + k]
-        if (line) l.drawLine(line, x + PAD, top + PAD + head + k * LINE + BASE, BODY)
+        const item = items[key][i + k]
+        const y = top + PAD + head + k * LINE
+        if (Array.isArray(item)) l.drawLine(item, x + PAD, y + BASE, BODY)
+        else if (item) label(item.label, y + 0.75)
       }
     }
     l.y += h
@@ -411,11 +437,14 @@ async function compareBody(l: Layout, rows: PdfMatch[]): Promise<void> {
     const again = (): void => l.band(`A ${m.a}`, `B ${m.b}`, m.tier, true)
     l.need(30 + PAD * 2 + HEAD + LINE * 2)
     l.band(`A ${m.a}`, `B ${m.b}`, m.tier, false)
-    for (const p of m.passages) {
+    for (const b of m.blocks) {
       await l.breathe()
-      const a = l.wrap(runs(p.a, diffRuns(p.a.text, p.b.text, 'a')), COL - PAD * 2, BODY)
-      const b = l.wrap(runs(p.b, diffRuns(p.a.text, p.b.text, 'b')), COL - PAD * 2, BODY)
-      passage(l, p, a, b, again)
+      block(
+        l,
+        { A: b.a[0]!.label, B: b.b[0]!.label },
+        { A: column(l, b.a, 'A'), B: column(l, b.b, 'B') },
+        again,
+      )
       l.y += 6
     }
     l.y += 12
@@ -428,7 +457,7 @@ async function repeatBody(l: Layout, rows: PdfGroup[]): Promise<void> {
     l.band(g.title, null, null, false)
     for (const p of g.places) {
       await l.breathe()
-      const lines = l.wrap(runs(p, [{ text: p.text, style: 'eq' }]), WIDTH - PLACE_W, BODY)
+      const lines = l.wrap(pieceRuns(p, 'A'), WIDTH - PLACE_W, BODY)
       const label = l.wrap([{ text: p.label, style: 'own' }], PLACE_W - 10, 8)
       if (l.need(LINE * 2)) l.band(g.title, null, null, true)
       l.y += 4

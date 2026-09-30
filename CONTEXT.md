@@ -160,6 +160,11 @@ Review (2026-09-30 #4, owner feedback on the PDF):
 - Export follows the active tab (전체 / 거의 동일 / 일부 수정, 3회 / 5회 이상),
   replacing Review #3's "always every finding"; the first page names it
   (`담은 결과`). Search is not applied.
+- Within a chapter pair the report shows each text once (owner's choice among
+  mocked options, 2026-09-30): findings whose context overlaps are joined into
+  one stretch with several marks (`14·16번째 문장`), and stretches linked by a
+  finding share one block, stacked per side. The on-screen detail still lists
+  passages one by one.
 
 ## Open decisions
 
