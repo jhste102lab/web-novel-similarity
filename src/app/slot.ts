@@ -4,6 +4,7 @@ import {
   type Manuscript,
   type ParsedFile,
 } from '../parsers/manuscript.ts'
+import { EncryptedFileError } from '../parsers/hwp.ts'
 import { parseFile, UnsupportedFormatError } from '../parsers/parseFile.ts'
 import type { ChapterRange, ManuscriptText } from '../shared/types.ts'
 
@@ -16,11 +17,23 @@ export interface Slot {
   range: ChapterRange | null
 }
 
+/** Some dropped files are not txt/docx/hwp/hwpx; the whole drop is rejected. */
 export class RejectedFilesError extends Error {
-  readonly hwp: boolean
+  readonly names: string[]
   constructor(names: string[]) {
     super(names.join(', '))
-    this.hwp = names.some((n) => /\.hwp$/i.test(n))
+    this.names = names
+  }
+}
+
+/** A supported file that could not be read (damaged, password-protected, not what its extension says). */
+export class FileReadError extends Error {
+  readonly fileName: string
+  readonly encrypted: boolean
+  constructor(fileName: string, cause: unknown) {
+    super(`${fileName}: ${String(cause)}`, { cause })
+    this.fileName = fileName
+    this.encrypted = cause instanceof EncryptedFileError
   }
 }
 
@@ -37,7 +50,7 @@ export async function loadSlot(files: File[]): Promise<Slot> {
       })
     } catch (err) {
       if (err instanceof UnsupportedFormatError) rejected.push(f.name)
-      else throw err
+      else throw new FileReadError(f.name, err)
     }
   }
   if (rejected.length > 0) throw new RejectedFilesError(rejected)
@@ -75,8 +88,7 @@ function formatChars(n: number): string {
 
 /** Card subtitle, e.g. "500개 파일 · 499화 · 198만 자". */
 export function slotInfo(slot: Slot): string {
-  const { rule, parts } = slot.manuscript
-  const files = rule === 'title-lines' || rule === 'none' ? 1 : parts.length
+  const { rule, files } = slot.manuscript
   const chapters = slot.labels.filter((l) => l !== null).length
   const middle = rule === 'none' ? '' : ` · ${chapters}화`
   return `${files}개 파일${middle} · ${formatChars(totalChars(slot))}`

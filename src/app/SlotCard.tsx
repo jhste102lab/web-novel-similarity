@@ -40,7 +40,7 @@ function EmptyCard({ slotKey, error, hint, onFiles }: Props) {
         ref={input}
         type="file"
         multiple
-        accept=".txt,.docx,.hwpx"
+        accept=".txt,.docx,.hwp,.hwpx"
         onChange={(e) => {
           onFiles([...(e.target.files ?? [])])
           e.target.value = ''

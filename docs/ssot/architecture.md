@@ -12,49 +12,50 @@ browser tab
  └─ worker (Web Worker)        index → retrieve candidates → compare → chain → tier → postMessage
 ```
 
-No network requests after the page loads. Parsing happens on the main thread
-(it needs `DOMParser`, and `mammoth` is loaded on demand); only the extracted
-text goes to the worker.
+No network requests after the page loads, except the lazily loaded chunks of
+this site. Parsing happens on the main thread (HWPX needs `DOMParser`;
+`mammoth` and rhwp are loaded on demand); only the extracted text goes to the
+worker.
 
 ## File map
 
 Where to look first for a given change. Tests sit next to their module.
 
-| Path                                                              | What lives there                                                                         |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `src/main.tsx`                                                    | React root, stylesheet imports, service-worker registration                              |
-| `src/shared/types.ts`                                             | Data contracts between parser, engine, worker and UI                                     |
-| `src/shared/constants.ts`                                         | Every threshold and limit (table below)                                                  |
-| `src/parsers/parseFile.ts`                                        | Extension → text; `.docx` via mammoth, `.hwp` rejected                                   |
-| `src/parsers/text.ts`, `hwpx.ts`                                  | `.txt` decoding (BOM, EUC-KR fallback); `.hwpx` section XML                              |
-| `src/parsers/chapters.ts`                                         | Chapter detection: filename numbers, filename order, title lines                         |
-| `src/parsers/manuscript.ts`                                       | Many files → one `Manuscript` → engine `ManuscriptText`                                  |
-| `src/engine/sentences.ts`                                         | Sentence split and normalised index in typed arrays                                      |
-| `src/engine/fingerprints.ts`, `candidates.ts`                     | Winnowing fingerprints, inverted index, candidate pairs                                  |
-| `src/engine/editDistance.ts`                                      | Banded Levenshtein → similarity ratio                                                    |
-| `src/engine/common.ts`                                            | 흔한 표현 detection, chapter-range mask                                                  |
-| `src/engine/compare.ts`                                           | A/B scan, passage chaining, chapter grouping, streaming snapshots                        |
-| `src/engine/repeats.ts`                                           | 내부 반복: union-find over near-duplicates in one manuscript                             |
-| `src/engine/diff.ts`                                              | Character diff shown in the detail pane and the report                                   |
-| `src/worker/`                                                     | `protocol.ts` messages, `worker.ts` entry, `client.ts` `runInWorker` (abort = terminate) |
-| `src/app/App.tsx`                                                 | Screen state machine (start → analyzing → results), header, export wiring                |
-| `src/app/StartScreen.tsx`, `SlotCard.tsx`, `RangeSlider.tsx`      | File slots, chapter table edits, 검사 범위                                               |
-| `src/app/slot.ts`, `dropFiles.ts`                                 | Slot model and labels; folder drops                                                      |
-| `src/app/AnalyzingScreen.tsx`                                     | Progress until the first findings arrive                                                 |
-| `src/app/ResultsShell.tsx`                                        | Shared result layout: windowed list, keyboard, search, panels                            |
-| `src/app/CompareView.tsx`, `RepeatView.tsx`                       | Row and detail rendering for each mode                                                   |
-| `src/app/results.ts`                                              | Tier labels, filters, position labels shared by views and report                         |
-| `src/app/CopyButton.tsx`, `Marked.tsx`, `Modal.tsx`, `Panels.tsx` | Copy, diff marks, confirm dialog, diagnostics/shortcut HUDs                              |
-| `src/app/ExportOverlay.tsx`, `src/export/`                        | Export dialog; printable report; PNG/PDF saving                                          |
-| `src/app/styles/`                                                 | One stylesheet per screen; `export.css` holds the print rules                            |
-| `public/sw.js`, `scripts/sw-precache.ts`                          | Offline cache; the build injects hashed file names                                       |
-| `scripts/compare.ts`                                              | CLI: compare two files, or find repeats in one                                           |
-| `bench/`                                                          | Synthetic corpus generator and threshold benchmark (`npm run bench`)                     |
+| Path                                                              | What lives there                                                                                        |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `src/main.tsx`                                                    | React root, stylesheet imports, service-worker registration                                             |
+| `src/shared/types.ts`                                             | Data contracts between parser, engine, worker and UI                                                    |
+| `src/shared/constants.ts`                                         | Every threshold and limit (table below)                                                                 |
+| `src/parsers/parseFile.ts`                                        | Extension → text; `.docx` via mammoth; `.hwp`/`.hwpx` by content (ZIP → HWPX, else HWP 5)               |
+| `src/parsers/text.ts`, `hwpx.ts`, `hwp.ts`                        | `.txt` decoding (BOM, EUC-KR fallback); HWPX section XML; HWP 5 via rhwp (ADR 0005)                     |
+| `src/parsers/chapters.ts`                                         | Chapter detection: filename numbers, filename order, title lines                                        |
+| `src/parsers/manuscript.ts`                                       | Many files → one `Manuscript` (split by title lines when every file has them) → engine `ManuscriptText` |
+| `src/engine/sentences.ts`                                         | Sentence split and normalised index in typed arrays                                                     |
+| `src/engine/fingerprints.ts`, `candidates.ts`                     | Winnowing fingerprints, inverted index, candidate pairs                                                 |
+| `src/engine/editDistance.ts`                                      | Banded Levenshtein → similarity ratio                                                                   |
+| `src/engine/common.ts`                                            | 흔한 표현 detection, chapter-range mask                                                                 |
+| `src/engine/compare.ts`                                           | A/B scan, passage chaining, chapter grouping, streaming snapshots                                       |
+| `src/engine/repeats.ts`                                           | 내부 반복: union-find over near-duplicates in one manuscript                                            |
+| `src/engine/diff.ts`                                              | Character diff shown in the detail pane and the report                                                  |
+| `src/worker/`                                                     | `protocol.ts` messages, `worker.ts` entry, `client.ts` `runInWorker` (abort = terminate)                |
+| `src/app/App.tsx`                                                 | Screen state machine (start → analyzing → results), header, export wiring                               |
+| `src/app/StartScreen.tsx`, `SlotCard.tsx`, `RangeSlider.tsx`      | File slots, chapter table edits, 검사 범위                                                              |
+| `src/app/slot.ts`, `dropFiles.ts`                                 | Slot model and labels; folder drops                                                                     |
+| `src/app/AnalyzingScreen.tsx`                                     | Progress until the first findings arrive                                                                |
+| `src/app/ResultsShell.tsx`                                        | Shared result layout: windowed list, keyboard, search, panels                                           |
+| `src/app/CompareView.tsx`, `RepeatView.tsx`                       | Row and detail rendering for each mode                                                                  |
+| `src/app/results.ts`                                              | Tier labels, filters, position labels shared by views and report                                        |
+| `src/app/CopyButton.tsx`, `Marked.tsx`, `Modal.tsx`, `Panels.tsx` | Copy, diff marks, confirm dialog, diagnostics/shortcut HUDs                                             |
+| `src/app/ExportOverlay.tsx`, `src/export/`                        | Export dialog; printable report; PNG/PDF saving                                                         |
+| `src/app/styles/`                                                 | One stylesheet per screen; `export.css` holds the print rules                                           |
+| `public/sw.js`, `scripts/sw-precache.ts`                          | Offline cache; the build injects hashed file names                                                      |
+| `scripts/compare.ts`                                              | CLI: compare two files, or find repeats in one                                                          |
+| `bench/`                                                          | Synthetic corpus generator and threshold benchmark (`npm run bench`)                                    |
 
 ## Pipeline
 
-1. **Parse** — `parsers/`: bytes → text. `.txt` (UTF-8 with BOM handling, EUC-KR fallback), `.docx` (mammoth, dynamically imported), `.hwpx` (fflate + `DOMParser` on `Contents/section*.xml`). `.hwp` → `UnsupportedFormatError`.
-2. **Chapters** — `parsers/chapters.ts`: filename numbers, filename order, or in-text title lines (rules in `CONTEXT.md`). `parsers/manuscript.ts` merges files into one `ManuscriptText` (`{ text, chapters }`).
+1. **Parse** — `parsers/`: bytes → text. `.txt` (UTF-8 with BOM handling, EUC-KR fallback), `.docx` (mammoth, dynamically imported). `.hwp` and `.hwpx` are told apart by content, not name: a ZIP is HWPX (fflate + `DOMParser` on `Contents/section*.xml`; each `<hp:t>` belongs to its closest `<hp:p>` so table cells are not doubled; `<hp:lineBreak/>` → newline), anything else goes to rhwp (`@rhwp/core`, dynamically imported WASM, `getTextFileUnicode`). A password-protected HWP 5 file → `EncryptedFileError`. Any other failure names the file (`FileReadError` in `app/slot.ts`).
+2. **Chapters** — `parsers/chapters.ts`: filename numbers, filename order, or in-text title lines (rules in `CONTEXT.md`). `parsers/manuscript.ts` merges files into one `ManuscriptText` (`{ text, chapters }`); text before the first title stays in the first chapter.
 3. **Sentence index** — `engine/sentences.ts`: split on Korean sentence enders and newlines; per sentence keep start/end offsets, chapter, in-chapter ordinal, and an NFC letters-only normalised form, in typed arrays.
 4. **Candidate retrieval** — `engine/fingerprints.ts`: Rabin–Karp rolling hashes over `NGRAM`-char windows, winnowed with window `WINDOW`, inverted index over side B (over A itself in 내부 반복); fingerprints occurring in more than `MAX_POSTINGS` sentences are dropped as non-discriminative. `engine/candidates.ts` returns sentences sharing ≥ `MIN_SHARED_FINGERPRINTS` fingerprints.
 5. **Precise compare** — `engine/editDistance.ts`: Ukkonen-banded Levenshtein on the normalised sentences → ratio. Pairs below `TIER_EDITED` are discarded, so nothing weaker than 일부 수정 is ever reported. There is no n-gram-only fallback: it only produced hits in the old 부분 유사 band, which was pure noise on unrelated manuscripts.
@@ -174,7 +175,9 @@ The two result views (`CompareView`, `RepeatView`) share `ResultsShell` in `src/
 ## Offline
 
 `public/sw.js` caches the shell and this build's JS/CSS at install, then every
-same-origin GET as it is requested. Assets are cache-first (their names carry a
+same-origin GET as it is requested (so rhwp's WASM, ~3.7 MB gzipped, is cached
+the first time an HWP 5 file is opened, not at install).
+Assets are cache-first (their names carry a
 content hash, so a hit is never the wrong file); **navigations are network-first**
 with a cache fallback, because the HTML shell names the hashed assets of its build
 and serving a cached one pins the whole app to an old version. The cache is named
@@ -191,5 +194,5 @@ the "nothing is uploaded" claim.
 
 Vite static build → `dist/`; GitHub Actions workflow on `main` publishes to
 GitHub Pages. `base` is `/web-novel-similarity/`, the repository name. No environment
-variables. `html2canvas-pro` and `mammoth` are dynamically imported so they
-stay out of the initial bundle.
+variables. `html2canvas-pro`, `mammoth` and `@rhwp/core` are dynamically
+imported so they stay out of the initial bundle.

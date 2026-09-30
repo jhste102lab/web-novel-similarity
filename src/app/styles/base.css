@@ -55,6 +55,11 @@ button {
   font-size: 17px;
   letter-spacing: -0.02em;
 }
+.logo .home {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
 .top .r {
   display: flex;
   gap: 8px;

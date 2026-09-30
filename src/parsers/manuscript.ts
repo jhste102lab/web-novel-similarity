@@ -1,10 +1,10 @@
-import type { ChapterRule, ManuscriptText } from '../shared/types.ts'
-import { chaptersFromTitles, orderFiles } from './chapters.ts'
+import type { Chapter, ChapterRule, ManuscriptText } from '../shared/types.ts'
+import { chaptersFromTitles, orderFiles, titleNumber } from './chapters.ts'
 
-/** One row of the slot card: a file (many-file input) or a detected chapter (single file). */
+/** One row of the slot card: a file (many-file input) or a chapter found by its title line. */
 export interface Part {
   name: string
-  /** File modification time; null for chapter rows of a single file. */
+  /** File modification time; null for chapter rows found by title lines. */
   lastModified: number | null
   label: number | null
   text: string
@@ -13,7 +13,9 @@ export interface Part {
 export interface Manuscript {
   title: string
   rule: ChapterRule
-  /** Rows in display order (files: reading order; single file: chapter order). */
+  /** Number of source files. */
+  files: number
+  /** Rows in display order (files: reading order; title lines: chapter order). */
   parts: Part[]
 }
 
@@ -26,12 +28,29 @@ export interface ParsedFile {
 export function buildManuscript(files: ParsedFile[]): Manuscript {
   if (files.length === 1) return fromSingleFile(files[0]!)
   const { rule, ordered } = orderFiles(files.map((f) => f.name))
-  const parts = ordered.map(({ index, label }) => {
-    const f = files[index]!
-    return { name: f.name, lastModified: f.lastModified, label, text: f.text }
-  })
+  const sorted = ordered.map(({ index, label }) => ({ file: files[index]!, label }))
   // Reading order, not input order: the fallback title must not depend on how files were picked.
-  return { title: commonTitle(parts.map((p) => p.name)), rule, parts }
+  const title = commonTitle(sorted.map((s) => s.file.name))
+  // Files that each hold several titled chapters ("1-100화.hwp", "101-200화.hwp") are split
+  // by those titles; a file number would label a hundred chapters as one. Files go in the
+  // order of their first title (file order on ties, e.g. 1부/2부 both starting at 1화).
+  const titled = sorted.map((s) => ({
+    file: s.file,
+    chapters: chaptersFromTitles(s.file.text).chapters,
+  }))
+  if (titled.every((t) => t.chapters.length > 0)) {
+    const parts = titled
+      .sort((x, y) => x.chapters[0]!.label! - y.chapters[0]!.label!)
+      .flatMap((t) => titleParts(t.file.text, t.chapters))
+    return { title, rule: 'title-lines', files: files.length, parts }
+  }
+  const parts = sorted.map(({ file, label }) => ({
+    name: file.name,
+    lastModified: file.lastModified,
+    label,
+    text: file.text,
+  }))
+  return { title, rule, files: files.length, parts }
 }
 
 function fromSingleFile(file: ParsedFile): Manuscript {
@@ -41,14 +60,24 @@ function fromSingleFile(file: ParsedFile): Manuscript {
     return {
       title,
       rule,
+      files: 1,
       parts: [{ name: file.name, lastModified: file.lastModified, label: null, text: file.text }],
     }
   }
-  const parts = chapters.map((c, i) => {
-    const text = file.text.slice(c.start, chapters[i + 1]?.start ?? file.text.length)
-    return { name: firstSentence(text), lastModified: null, label: c.label, text }
+  return { title, rule, files: 1, parts: titleParts(file.text, chapters) }
+}
+
+/** One row per title. Text before the first title (a prologue, a header) stays with the first chapter. */
+function titleParts(text: string, chapters: Chapter[]): Part[] {
+  return chapters.map((c, i) => {
+    const own = text.slice(c.start, chapters[i + 1]?.start ?? text.length)
+    return {
+      name: firstSentence(own),
+      lastModified: null,
+      label: c.label,
+      text: i === 0 ? text.slice(0, c.start) + own : own,
+    }
   })
-  return { title, rule, parts }
 }
 
 /** Engine input in chapter order: labelled parts by label, unlabelled ones after them in row order. */
@@ -67,13 +96,13 @@ export function toEngineText(m: Manuscript): ManuscriptText {
   return { text, chapters: m.rule === 'none' ? [] : chapters }
 }
 
-/** Second non-empty line of a chapter (the first is its title), trimmed for the row label. */
+/** First non-empty line after the title (and a repeated title line), trimmed for the row label. */
 function firstSentence(text: string): string {
   const lines = text
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
-  return (lines[1] ?? lines[0] ?? '').slice(0, 60)
+  return (lines.find((l, i) => i > 0 && titleNumber(l) === null) ?? lines[0] ?? '').slice(0, 60)
 }
 
 function stem(name: string): string {

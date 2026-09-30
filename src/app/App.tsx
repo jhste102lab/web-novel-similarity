@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CompareReport, RepeatReport } from '../export/Report.tsx'
 import { MAX_PASSAGES_PER_MATCH } from '../shared/constants.ts'
 import type { CompareResult, RepeatResult } from '../shared/types.ts'
@@ -10,6 +10,7 @@ import { RepeatView } from './RepeatView.tsx'
 import { CompareView } from './CompareView.tsx'
 import { filterGroups, filterMatches, type CompareFilter, type RepeatFilter } from './results.ts'
 import {
+  FileReadError,
   loadSlot,
   rangeLabel,
   RejectedFilesError,
@@ -37,11 +38,9 @@ type Screen =
     }
 
 const REPO = 'https://github.com/jhste102lab/web-novel-similarity'
-const HWP_MESSAGE = 'hwp는 열 수 없어요. 한글에서 hwpx로 저장해 주세요.'
-const FORMAT_MESSAGE = 'txt, docx, hwpx 파일만 열 수 있어요.'
 
 export function App() {
-  const [two, setTwo] = useState(true)
+  const [two, setTwo] = useState(false)
   const [slots, setSlots] = useState<Record<Key, SlotView>>({
     A: { slot: null, error: null },
     B: { slot: null, error: null },
@@ -55,6 +54,16 @@ export function App() {
   const [runError, setRunError] = useState<string | null>(null)
   const [perMatch, setPerMatch] = useState(MAX_PASSAGES_PER_MATCH)
 
+  // Nothing is saved, so leaving the page (reload, close, back) loses the loaded files and
+  // results; the browser asks first.
+  const unsaved = slots.A.slot !== null || slots.B.slot !== null || screen.kind !== 'start'
+  useEffect(() => {
+    if (!unsaved) return
+    const ask = (e: BeforeUnloadEvent): void => e.preventDefault()
+    window.addEventListener('beforeunload', ask)
+    return () => window.removeEventListener('beforeunload', ask)
+  }, [unsaved])
+
   const setSlot = (key: Key, view: SlotView): void => setSlots((s) => ({ ...s, [key]: view }))
 
   const onFiles = async (key: Key, files: File[]): Promise<void> => {
@@ -62,13 +71,7 @@ export function App() {
     try {
       setSlot(key, { slot: await loadSlot(files), error: null })
     } catch (err) {
-      const message =
-        err instanceof RejectedFilesError
-          ? err.hwp
-            ? HWP_MESSAGE
-            : FORMAT_MESSAGE
-          : '파일을 읽지 못했어요.'
-      setSlot(key, { slot: null, error: message })
+      setSlot(key, { slot: null, error: fileError(err) })
     }
   }
 
@@ -138,13 +141,29 @@ export function App() {
       },
     })
 
+  // The header title leads back to the start screen; loaded files stay, results go.
+  const goHome = (): void => {
+    if (screen.kind === 'start') return
+    const run = screen.run
+    confirm(
+      run ? '검사를 중단하고 처음으로 갈까요?' : '처음으로 갈까요?',
+      run ? '지금까지 찾은 결과는 사라집니다.' : '지금 결과는 사라집니다.',
+      () => {
+        run?.abort()
+        setScreen({ kind: 'start' })
+      },
+    )
+  }
+
   const results = screen.kind === 'results' ? screen : null
 
   return (
     <>
       <header className="top">
         <div className="logo">
-          웹소설 문장 · 문단 유사도 검사
+          <button className="home" onClick={goHome}>
+            웹소설 문장 · 문단 유사도 검사
+          </button>
           <a className="gh" href={REPO} title="GitHub" target="_blank" rel="noreferrer">
             <GithubIcon />
           </a>
@@ -290,6 +309,19 @@ export function App() {
       )}
     </>
   )
+}
+
+/** Slot notice for a failed drop, naming the file so one bad file among hundreds can be found. */
+function fileError(err: unknown): string {
+  if (err instanceof RejectedFilesError) {
+    const more = err.names.length > 1 ? ` 외 ${err.names.length - 1}개` : ''
+    return `‘${err.names[0]}’${more}: txt, docx, hwp, hwpx 파일만 열 수 있어요.`
+  }
+  if (err instanceof FileReadError)
+    return err.encrypted
+      ? `‘${err.fileName}’ 파일은 암호가 걸려 있어요. 한글에서 암호를 풀고 다시 저장해 주세요.`
+      : `‘${err.fileName}’ 파일을 읽지 못했어요.`
+  return '파일을 읽지 못했어요.'
 }
 
 /** "A 401~500화 · B 전체", or null when both cover everything. */
