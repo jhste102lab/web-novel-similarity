@@ -198,6 +198,38 @@ button {
   height: 100%;
   border: 0;
 }
+.ov .wait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--meta);
+  padding: 24px;
+}
+.ov .saving {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+.ov .saving .bar {
+  width: 140px;
+}
+/* A transform animation keeps turning while parsing blocks the main thread. */
+.spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  border: 3px solid var(--muted);
+  border-top-color: var(--fg);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .dot {
   width: 8px;
   height: 8px;

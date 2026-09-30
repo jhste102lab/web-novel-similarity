@@ -162,18 +162,22 @@
   font-weight: 700;
   letter-spacing: -0.02em;
 }
-.detail .head .pct .f {
-  font-size: 15px;
-  font-weight: 500;
+.detail .head .pct.files {
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+.detail .head .pct span {
   color: var(--meta);
-  letter-spacing: 0;
+  margin: 0 4px;
 }
 .detail .head .tier {
   font-weight: 600;
+  white-space: nowrap;
 }
 .detail .head .where {
   color: var(--meta);
   margin-left: auto;
+  white-space: nowrap;
 }
 /* In the repeat header the copy button sits beside the count, so the span keeps the right edge. */
 .detail .head .copy {
@@ -186,6 +190,16 @@
 }
 .detail .cmp + .cmp {
   margin-top: 16px;
+}
+/* Each side's 회차 over its column. */
+.detail .cmp.chs {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 0 4px;
+}
+.detail .cmp.chs + .cmp {
+  margin-top: 8px;
 }
 .pane {
   white-space: pre-line;
@@ -219,6 +233,7 @@
   gap: 20px;
   font-size: 15px;
   line-height: 1.8;
+  white-space: pre-line;
 }
 .occ .ch {
   flex: none;

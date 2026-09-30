@@ -308,9 +308,9 @@ class Layout {
 
 function runs(side: Around, mid: Run[]): Run[] {
   return [
-    ...(side.before ? [{ text: side.before + ' ', style: 'ctx' as const }] : []),
+    ...(side.before ? [{ text: side.before, style: 'ctx' as const }] : []),
     ...mid,
-    ...(side.after ? [{ text: ' ' + side.after, style: 'ctx' as const }] : []),
+    ...(side.after ? [{ text: side.after, style: 'ctx' as const }] : []),
   ]
 }
 
@@ -461,19 +461,32 @@ function headerOf(input: PdfInput): string {
     .join('  ↔  ')
 }
 
+/** Thrown out of the drawing pass once a preview has its pages. */
+const STOP = Symbol('stop')
+
 /**
  * Lays the report out twice: once without drawing to count pages (the footer says "n / N"),
- * then onto `canvas`. `onPage` reports each page of the drawing pass.
+ * then onto `canvas`. `onPage` reports each page of the drawing pass. With `limit`, only the
+ * first `limit` pages are drawn (a preview); their footers still count every page.
  */
 export async function renderPdf(
   input: PdfInput,
   canvas: Canvas,
   onPage: (page: number, pages: number) => void,
+  limit = Infinity,
 ): Promise<number> {
   const header = headerOf(input)
   const count = new Layout(null, canvas, 0, header, input.date, () => {})
   await run(count, input)
   const pages = count.page
-  await run(new Layout(canvas, canvas, pages, header, input.date, (p) => onPage(p, pages)), input)
+  const draw = new Layout(canvas, canvas, pages, header, input.date, (p) => {
+    if (p > limit) throw STOP
+    onPage(p, pages)
+  })
+  try {
+    await run(draw, input)
+  } catch (err) {
+    if (err !== STOP) throw err
+  }
   return pages
 }

@@ -87,11 +87,12 @@ Caps added because of this run:
   500 × 500 chapters, ~2M chars per side from `bench/run.ts`'s Performance
   section) showed all 168,083 chapter pairs: comparison finished in 6.5 s end
   to end, main-thread JS heap was 1.66 GB after results, and a sort toggle took
-  0.1 s. Its PDF (tinted A/B columns, two context sentences a side) had
-  83,831 pages, 337 MB, built in 130 s, and opened in Chrome's preview. The
-  earlier one-sentence layout gave 51,311 pages / 222 MB / 86 s. Before
-  yielding every ten pages to drain PDFKit's output queue, that export took
-  249 s.
+  0.1 s. Its PDF (tinted A/B columns, four context sentences a side) had
+  134,385 pages, 477 MB; the 30-page preview took 26 s (mostly counting pages)
+  and saving the whole file 152 s. Earlier layouts gave 83,831 pages / 337 MB /
+  130 s (two sentences) and 51,311 pages / 222 MB / 86 s (one sentence).
+  Before yielding every ten pages to drain PDFKit's output queue, the
+  one-sentence export took 249 s.
 - `MAX_PASSAGES_PER_MATCH = 20` passages per chapter pair, strongest first, with
   `유사 문장 26개 · 상위 20개 표시` in the detail header.
 - The 내부 반복 detail pane lists at most 100 occurrences of a group (`외 882곳`
@@ -105,7 +106,7 @@ former PNG export produced a 860 × 16,000 px image. These describe the old
 behaviour, not the current HWP reader, streaming stop or PDF export.
 
 The 2026-09-30 PDF export measurements (Chrome, M5 Mac, production build via
-Vite preview) also covered `docs/samples`: 26 chapter pairs, 61 pages, 0.33 MB,
+Vite preview) also covered `docs/samples`: 26 chapter pairs, 62 pages, 0.33 MB,
 ~0.3 s. In Node, 3,000 dense pages took PDFKit 7.5 s / 23.8 MB / 268 MB peak
 RSS, versus jsPDF 10.3 s / 24.3 MB / 1.9 GB peak RSS (ADR 0007).
 

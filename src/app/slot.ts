@@ -40,11 +40,31 @@ export class FileReadError extends Error {
   }
 }
 
-/** Parses dropped/selected files into a slot. Rejects the whole drop when any file is unsupported. */
-export async function loadSlot(files: File[]): Promise<Slot> {
+/** Lets the browser paint (progress, spinner) before more parsing blocks the main thread. */
+function frame(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>()
+  requestAnimationFrame(() => setTimeout(resolve, 0))
+  return promise
+}
+
+/**
+ * Parses dropped/selected files into a slot. Rejects the whole drop when any file is unsupported.
+ * `onProgress` gets the files read so far, at most every 50 ms.
+ */
+export async function loadSlot(
+  files: File[],
+  onProgress: (done: number) => void = () => {},
+): Promise<Slot> {
   const parsed: ParsedFile[] = []
   const rejected: string[] = []
-  for (const f of files) {
+  await frame()
+  let painted = performance.now()
+  for (const [i, f] of files.entries()) {
+    if (performance.now() - painted > 50) {
+      onProgress(i)
+      await frame()
+      painted = performance.now()
+    }
     try {
       parsed.push({
         name: f.name,
@@ -56,6 +76,8 @@ export async function loadSlot(files: File[]): Promise<Slot> {
       else throw new FileReadError(f.name, err)
     }
   }
+  onProgress(files.length)
+  await frame()
   if (rejected.length > 0) throw new RejectedFilesError(rejected)
   const manuscript = buildManuscript(parsed)
   return {

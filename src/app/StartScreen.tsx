@@ -4,6 +4,8 @@ import type { Slot } from './slot.ts'
 export interface SlotView {
   slot: Slot | null
   error: string | null
+  /** Set while dropped files are being read. */
+  loading?: { done: number; total: number }
 }
 
 interface Props {
@@ -46,6 +48,7 @@ export function StartScreen({
           slotKey="A"
           slot={a.slot}
           error={a.error}
+          loading={a.loading}
           hint="txt · docx · hwp · hwpx"
           onFiles={(f) => onFiles('A', f)}
           onChange={(s) => onChange('A', s)}
@@ -62,6 +65,7 @@ export function StartScreen({
               slotKey="B"
               slot={b.slot}
               error={b.error}
+              loading={b.loading}
               hint="txt · docx · hwp · hwpx"
               onFiles={(f) => onFiles('B', f)}
               onChange={(s) => onChange('B', s)}

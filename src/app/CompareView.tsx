@@ -142,15 +142,18 @@ function MatchDetail({
   return (
     <>
       <div className="head">
-        <span className="pct">
-          A <span className="f">{fileA(first.a.start)}</span> {chapterLabel(m.a)} ↔ B{' '}
-          <span className="f">{fileB(first.b.start)}</span> {chapterLabel(m.b)}
+        <span className="pct files">
+          A {fileA(first.a.start)} <span>↔</span> B {fileB(first.b.start)}
         </span>
         <span className="tier">{TIER_LABEL[m.tier]}</span>
         <span className="where">
           유사 문장 {m.count}개 · 구간 {m.runs}개
           {m.runs > m.passages.length && ` (상위 ${m.passages.length}개 표시)`}
         </span>
+      </div>
+      <div className="cmp chs">
+        <div>{chapterLabel(m.a)}</div>
+        <div>{chapterLabel(m.b)}</div>
       </div>
       {m.passages.map((p, i) => (
         <PassagePair
@@ -209,9 +212,9 @@ function PassagePair({
 export function Context({ around, children }: { around: Around; children: React.ReactNode }) {
   return (
     <>
-      {around.before && <span className="ctx">{around.before} </span>}
+      {around.before && <span className="ctx">{around.before}</span>}
       {children}
-      {around.after && <span className="ctx"> {around.after}</span>}
+      {around.after && <span className="ctx">{around.after}</span>}
     </>
   )
 }

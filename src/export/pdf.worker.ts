@@ -8,17 +8,19 @@ export interface PdfRequest {
   input: PdfInput
   /** URL of the Korean TTF bundled with the app; the PDF embeds the glyphs it uses. */
   font: string
+  /** Draw only the first pages (a preview). */
+  limit?: number
 }
 export type PdfResponse =
   | { type: 'progress'; page: number; pages: number }
-  | { type: 'done'; blob: Blob }
+  | { type: 'done'; blob: Blob; pages: number }
   | { type: 'error'; message: string }
 
 const post = (msg: PdfResponse): void => self.postMessage(msg)
 
 self.onmessage = async (e: MessageEvent<PdfRequest>) => {
   try {
-    const { input, font } = e.data
+    const { input, font, limit } = e.data
     const data = await (await fetch(font)).arrayBuffer()
     const doc = new PDFDocument({
       size: 'A4',
@@ -31,7 +33,8 @@ self.onmessage = async (e: MessageEvent<PdfRequest>) => {
     })
     const parts: BlobPart[] = []
     doc.on('data', (chunk: Uint8Array<ArrayBuffer>) => parts.push(chunk))
-    const ended = new Promise<void>((resolve) => doc.on('end', () => resolve()))
+    const ended = Promise.withResolvers<void>()
+    doc.on('end', () => ended.resolve())
     const opts = { lineBreak: false, baseline: 'alphabetic' } as const
     const canvas: Canvas = {
       addPage: () => void doc.addPage(),
@@ -40,12 +43,17 @@ self.onmessage = async (e: MessageEvent<PdfRequest>) => {
       circle: (x, y, r, color) => void doc.circle(x, y, r).fill(color),
       width: (ch) => doc.fontSize(1000).widthOfString(ch) / 1000,
     }
-    await renderPdf(input, canvas, (page, pages) => {
-      if (page % 20 === 0 || page === pages) post({ type: 'progress', page, pages })
-    })
+    const pages = await renderPdf(
+      input,
+      canvas,
+      (page, pages) => {
+        if (page % 20 === 0 || page === pages) post({ type: 'progress', page, pages })
+      },
+      limit,
+    )
     doc.end()
-    await ended
-    post({ type: 'done', blob: new Blob(parts, { type: 'application/pdf' }) })
+    await ended.promise
+    post({ type: 'done', blob: new Blob(parts, { type: 'application/pdf' }), pages })
   } catch (err) {
     post({ type: 'error', message: String(err) })
   }

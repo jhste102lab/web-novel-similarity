@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { aroundOf } from '../engine/context.ts'
-import { download, exportPdf } from '../export/exportPdf.ts'
+import { download, exportPdf, type Pdf } from '../export/exportPdf.ts'
 import type { PdfInput } from '../export/pdf.ts'
 import type { CompareResult, RepeatResult } from '../shared/types.ts'
 import { runInWorker, type Run } from '../worker/client.ts'
@@ -35,12 +35,17 @@ import { StartScreen, type SlotView } from './StartScreen.tsx'
 
 type Key = 'A' | 'B'
 
-/** A PDF being built (the page being drawn), built (its preview URL), or why it failed. */
+/** Pages drawn for the 내보내기 preview; saving builds the whole file. */
+const PREVIEW_PAGES = 30
+
+/** 내보내기: a preview of the first pages, then, once saving is confirmed, the whole file. */
 interface PdfJob {
-  run: Run<Blob>
-  page: number
-  pages: number
-  done?: { blob: Blob; url: string }
+  input: PdfInput
+  preview: Run<Pdf>
+  /** Set once the preview is drawn. */
+  shown?: { pdf: Pdf; url: string }
+  /** The whole file being built after 저장 was confirmed. */
+  save?: { run: Run<Pdf>; page: number }
   error?: string
 }
 
@@ -91,8 +96,13 @@ export function App() {
 
   const onFiles = async (key: Key, files: File[]): Promise<void> => {
     if (files.length === 0) return
+    const total = files.length
+    setSlot(key, { slot: null, error: null, loading: { done: 0, total } })
     try {
-      setSlot(key, { slot: await loadSlot(files), error: null })
+      const slot = await loadSlot(files, (done) =>
+        setSlot(key, { slot: null, error: null, loading: { done, total } }),
+      )
+      setSlot(key, { slot, error: null })
     } catch (err) {
       setSlot(key, { slot: null, error: fileError(err) })
     }
@@ -190,36 +200,62 @@ export function App() {
   const fileB = useMemo(() => (slotB ? slotFileAt(slotB) : null), [slotB])
 
   // The report holds every finding, in the order the list shows, whatever the tab or search.
-  // It opens as a preview; saving asks first.
+  // 내보내기 opens a preview of its first pages; saving asks, then builds the whole file.
   const startPdf = (): void => {
     if (!results || !aroundA || !fileA) return
-    const run = exportPdf(pdfInput(results, order, aroundA, aroundB, fileA, fileB), (page, pages) =>
-      setPdf((j) => (j && j.run === run ? { ...j, page, pages } : j)),
-    )
-    setPdf({ run, page: 0, pages: 0 })
-    run.result.then(
-      (blob) =>
+    const input = pdfInput(results, order, aroundA, aroundB, fileA, fileB)
+    const preview = exportPdf(input, () => {}, PREVIEW_PAGES)
+    setPdf({ input, preview })
+    preview.result.then(
+      (p) =>
         setPdf((j) =>
-          j?.run === run ? { ...j, done: { blob, url: URL.createObjectURL(blob) } } : j,
+          j?.preview === preview
+            ? { ...j, shown: { pdf: p, url: URL.createObjectURL(p.blob) } }
+            : j,
         ),
       (err: unknown) => {
-        if (run.aborted) return
-        setPdf((j) => (j?.run === run ? { ...j, error: String(err) } : j))
+        if (preview.aborted) return
+        setPdf((j) => (j?.preview === preview ? { ...j, error: String(err) } : j))
       },
     )
   }
   const closePdf = (): void => {
-    pdf?.run.abort()
-    if (pdf?.done) URL.revokeObjectURL(pdf.done.url)
+    pdf?.preview.abort()
+    pdf?.save?.run.abort()
+    if (pdf?.shown) URL.revokeObjectURL(pdf.shown.url)
     setPdf(null)
   }
   // "2026. 9. 30." ends in a dot; the name would read "30..pdf".
   const pdfName = `유사도 검사 ${today().slice(0, -1)}.pdf`
-  const savePdf = (): void =>
-    confirm('PDF로 저장할까요?', `${pdfName} · ${pdf?.pages.toLocaleString()}쪽`, () => {
-      if (pdf?.done) download(pdf.done.blob, pdfName)
-      closePdf()
+  const savePdf = (): void => {
+    const job = pdf
+    if (!job?.shown) return
+    const { pdf: shown, url } = job.shown
+    confirm('PDF로 저장할까요?', `${pdfName} · ${shown.pages.toLocaleString()}쪽`, () => {
+      const finish = (blob: Blob): void => {
+        download(blob, pdfName)
+        URL.revokeObjectURL(url)
+        setPdf((j) => (j?.preview === job.preview ? null : j))
+      }
+      // The preview already is the whole report.
+      if (shown.pages <= PREVIEW_PAGES) return finish(shown.blob)
+      const run = exportPdf(job.input, (page) =>
+        setPdf((j) => (j?.save?.run === run ? { ...j, save: { run, page } } : j)),
+      )
+      setPdf((j) => (j?.preview === job.preview ? { ...j, save: { run, page: 0 } } : j))
+      run.result.then(
+        (p) => finish(p.blob),
+        (err: unknown) => {
+          if (run.aborted) return
+          setPdf((j) => (j?.save?.run === run ? { ...j, save: undefined, error: String(err) } : j))
+        },
+      )
     })
+  }
+  const stopSave = (): void => {
+    pdf?.save?.run.abort()
+    setPdf((j) => (j ? { ...j, save: undefined } : j))
+  }
 
   const listProps = {
     query,
@@ -351,43 +387,53 @@ export function App() {
           />
         )}
       </main>
-      {pdf?.done && (
+      {pdf && (
         <div className="ov">
           <div className="panel">
             <div className="ph">
               <h2>내보내기</h2>
-              <span className="est">{pdf.pages.toLocaleString()}쪽</span>
-              <button className="btn primary" onClick={savePdf}>
-                PDF로 저장
-              </button>
+              {pdf.shown && (
+                <span className="est">
+                  전체 {pdf.shown.pdf.pages.toLocaleString()}쪽
+                  {pdf.shown.pdf.pages > PREVIEW_PAGES && ` · 앞 ${PREVIEW_PAGES}쪽 미리보기`}
+                </span>
+              )}
+              {pdf.save ? (
+                <>
+                  <span className="saving">
+                    PDF 만드는 중 {pdf.save.page.toLocaleString()} /{' '}
+                    {pdf.shown?.pdf.pages.toLocaleString()}쪽
+                    <span className="bar">
+                      <i
+                        style={{
+                          width: `${(pdf.save.page / (pdf.shown?.pdf.pages ?? 1)) * 100}%`,
+                        }}
+                      />
+                    </span>
+                  </span>
+                  <button className="btn" onClick={stopSave}>
+                    취소
+                  </button>
+                </>
+              ) : (
+                <button className="btn primary" onClick={savePdf} disabled={!pdf.shown}>
+                  PDF로 저장
+                </button>
+              )}
               <button className="x" onClick={closePdf}>
                 ×
               </button>
             </div>
-            <iframe title="PDF 미리보기" src={pdf.done.url} />
-          </div>
-        </div>
-      )}
-      {pdf && !pdf.done && (
-        <div className="modal">
-          <div className="box">
-            <h3>{pdf.error ? 'PDF를 만들지 못했어요' : 'PDF 만드는 중'}</h3>
-            <p>
-              {pdf.error ??
-                (pdf.pages > 0
-                  ? `${pdf.page.toLocaleString()} / ${pdf.pages.toLocaleString()}쪽`
-                  : '쪽을 나누고 있어요…')}
-            </p>
-            {!pdf.error && (
-              <div className="bar">
-                <i style={{ width: `${pdf.pages > 0 ? (pdf.page / pdf.pages) * 100 : 0}%` }} />
+            {pdf.error ? (
+              <div className="wait">PDF를 만들지 못했어요. {pdf.error}</div>
+            ) : pdf.shown ? (
+              <iframe title="PDF 미리보기" src={pdf.shown.url} />
+            ) : (
+              <div className="wait">
+                <i className="spinner" />
+                미리보기를 만드는 중
               </div>
             )}
-            <div className="acts">
-              <button className="btn" onClick={closePdf}>
-                {pdf.error ? '닫기' : '취소'}
-              </button>
-            </div>
           </div>
         </div>
       )}

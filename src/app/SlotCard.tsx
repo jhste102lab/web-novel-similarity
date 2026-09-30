@@ -8,6 +8,8 @@ interface Props {
   slot: Slot | null
   /** Rejection notice shown under the format hint. */
   error: string | null
+  /** Files read so far while a drop is being parsed. */
+  loading?: { done: number; total: number }
   hint: string
   onFiles: (files: File[]) => void
   onChange: (slot: Slot) => void
@@ -18,9 +20,26 @@ export function SlotCard(props: Props) {
   return props.slot ? <FilledCard {...props} slot={props.slot} /> : <EmptyCard {...props} />
 }
 
-function EmptyCard({ slotKey, error, hint, onFiles }: Props) {
+function EmptyCard({ slotKey, error, loading, hint, onFiles }: Props) {
   const [over, setOver] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+  if (loading) {
+    return (
+      <div className="slot loading">
+        <i className="spinner" />
+        <div className="fmt">
+          파일 읽는 중
+          {loading.total > 1 &&
+            ` · ${loading.done.toLocaleString()} / ${loading.total.toLocaleString()}개`}
+        </div>
+        {loading.total > 1 && (
+          <div className="bar">
+            <i style={{ width: `${(loading.done / loading.total) * 100}%` }} />
+          </div>
+        )}
+      </div>
+    )
+  }
   return (
     <div
       className={`slot ${over ? 'over' : ''}`}

@@ -1,6 +1,10 @@
 import type { ManuscriptText } from '../shared/types.ts'
 
-/** A finding's own text with the sentences just before and after it, from the same 회차. */
+/**
+ * A finding's own text with the sentences just before and after it, from the same 회차.
+ * `before` ends and `after` starts with the text's own separator (a space or line breaks), so
+ * `before + text + after` reads as the manuscript does.
+ */
 export interface Around {
   before: string
   text: string
@@ -11,12 +15,17 @@ export interface Around {
 // but keeping short sentences ("응.") that the index skips.
 const PIECE = /[^.!?\n]*(?:[.!?]+[”’"'」』)\]]*|\n+|$)/gu
 /** Neighbour sentences shown on each side. */
-const SENTENCES = 2
+const SENTENCES = 4
 /** How far to look for neighbours; a longer neighbour shows only its nearer part. */
-const REACH = 500
+const REACH = 1000
 
-function pieces(t: string): string[] {
-  return (t.match(PIECE) ?? []).map((p) => p.trim()).filter((p) => p !== '')
+/** Offsets in `t` where its non-blank sentence pieces start and end. */
+function pieces(t: string): [number, number][] {
+  const out: [number, number][] = []
+  for (const m of t.matchAll(PIECE)) {
+    if (m[0].trim() !== '') out.push([m.index, m.index + m[0].length])
+  }
+  return out
 }
 
 /**
@@ -37,14 +46,21 @@ export function aroundOf(m: ManuscriptText): (start: number, end: number) => Aro
   }
   return (start, end) => {
     const [from, to] = segment(start)
+    const pre = m.text.slice(Math.max(from, start - REACH), start)
+    const post = m.text.slice(end, Math.min(to, end + REACH))
+    const p = pieces(pre)
+    const q = pieces(post)
+    const before = p.length > 0 ? pre.slice(p[Math.max(0, p.length - SENTENCES)]![0]) : ''
+    const after = q.length > 0 ? post.slice(0, q[Math.min(q.length, SENTENCES) - 1]![1]) : ''
     return {
-      before: pieces(m.text.slice(Math.max(from, start - REACH), start))
-        .slice(-SENTENCES)
-        .join(' '),
+      before: paragraphs(before.trimStart()),
       text: m.text.slice(start, end).trim(),
-      after: pieces(m.text.slice(end, Math.min(to, end + REACH)))
-        .slice(0, SENTENCES)
-        .join(' '),
+      after: paragraphs(after.trimEnd()),
     }
   }
+}
+
+/** Keeps line breaks but at most one blank line between paragraphs. */
+function paragraphs(t: string): string {
+  return t.replace(/\n\s*\n\s*/gu, '\n\n')
 }

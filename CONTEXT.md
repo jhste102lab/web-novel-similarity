@@ -65,9 +65,10 @@ Product (2026-09-21, design accepted):
   tabs: 전체 / 거의 동일 / 일부 수정 (A/B) and 전체 / 3회 이상 / 5회 이상 (내부 반복).
 - Only suspicions are shown. Below 일부 수정 and every 흔한 표현 is removed by
   the engine, and no similarity percentage is displayed anywhere.
-- Export: 내보내기 builds a PDF of every finding, in the list's current sort
-  order, regardless of tab or search, and shows it in the browser's PDF
-  viewer; `PDF로 저장` asks `PDF로 저장할까요?` before downloading.
+- Export: 내보내기 opens a preview of the report's first 30 pages in the
+  browser's PDF viewer, with the total page count. `PDF로 저장` asks
+  `PDF로 저장할까요?`, then builds the whole report (every finding, in the
+  list's current sort order, regardless of tab or search) and downloads it.
 - Privacy is shown, not explained: one line under the title
   (`파일은 서버에 저장하지 않고 사용자의 브라우저에서만 처리됩니다`).
 - Persistence: memory only. Refresh discards results. No JSON save/reopen.
@@ -143,14 +144,19 @@ Review (2026-09-30 #3, owner feedback on real results):
 
 Review (2026-09-30 #4, owner feedback on the PDF):
 
-- A/B labels carry the source file: detail header and panes
-  (`A 원본.txt · 3화 · 1번째 문장`) and the PDF bands and columns.
+- A/B labels carry the source file: the detail header reads
+  `A 원본.txt ↔ B 편집본.txt`, each column is headed by its 회차, and panes
+  read `A 원본.txt · 3화 · 1번째 문장`; the PDF bands and columns likewise.
 - PDF: first page is a ruled table (검사일 / 원고 A / 원고 B / 결과), each
   manuscript tinted in its colour (A blue, B green); passages sit in tinted
   A/B columns with a lettered chip. The per-pair note
   (`일부 수정 · 유사 문장 N개 · 구간 M개`) is dropped; the tier dot stays and
   the legend names it.
-- 내보내기 shows the finished PDF first; saving is confirmed with 예/아니오.
+- 내보내기 opens the preview at once; the whole file is built only after the
+  save is confirmed with 예/아니오.
+- Context: four sentences a side, keeping the manuscript's line breaks (at
+  most one blank line).
+- A slot shows a spinner (and `n / N개` for many files) while files are read.
 
 ## Open decisions
 

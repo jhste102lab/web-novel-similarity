@@ -106,14 +106,14 @@ describe('findRepeats', () => {
     expect(r.groups[0]!.occurrences.map((o) => o.chapter)).toEqual([1, 2])
     const around = aroundOf(m)
     expect(r.groups[0]!.occurrences.map((o) => around(o.start, o.end))).toEqual([
-      // Two neighbours a side, inside the chapter: before the first sentence of 1화 is its title line.
+      // Up to four neighbours a side, inside the chapter, with the manuscript's own line breaks.
       {
-        before: '#1화',
+        before: '#1화\n',
         text: '반복되는 문장이 있다.',
-        after: '반복되는 문장이 있다. 아무 관계 없는 이야기.',
+        after: '\n반복되는 문장이 있다.\n아무 관계 없는 이야기.\n다른 이야기가 이어진다.',
       },
       {
-        before: '또 다른 이야기가 이어진다. 이야기는 계속된다.',
+        before: '#2화\n또 다른 이야기가 이어진다.\n이야기는 계속된다.\n',
         text: '반복되는 문장이 있다.',
         after: '',
       },

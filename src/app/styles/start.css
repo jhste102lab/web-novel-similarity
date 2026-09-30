@@ -134,6 +134,13 @@
   color: var(--meta);
   font-size: 13px;
 }
+.slot.loading {
+  gap: 14px;
+  cursor: progress;
+}
+.slot.loading .bar {
+  width: 60%;
+}
 .slot.filled {
   border: 1.5px solid var(--border);
   cursor: default;
