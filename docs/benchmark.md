@@ -87,15 +87,18 @@ Caps added because of this run:
   500 × 500 chapters, ~2M chars per side from `bench/run.ts`'s Performance
   section) showed all 168,083 chapter pairs: comparison finished in 6.5 s end
   to end, main-thread JS heap was 1.66 GB after results, and a sort toggle took
-  0.1 s. Its PDF (tinted A/B columns, four context sentences a side, findings
-  with overlapping context joined so each text appears once per chapter pair)
-  had 111,681 pages, 413 MB; the 30-page preview took 23 s (mostly counting
-  pages) and saving the whole file 127 s. Before joining it was 134,385 pages /
-  477 MB / 152 s. Earlier layouts gave 83,831 pages / 337 MB / 130 s (two
-  sentences) and 51,311 pages / 222 MB / 86 s (one sentence). Before yielding
-  every ten pages to drain PDFKit's output queue, the one-sentence export took
-  249 s. On two real manuscripts kept outside the repository, joining cut one
-  report from 7,949 to 4,372 pages and another from 1,510 to 943.
+  0.1 s. Its PDF (four context sentences a side; findings with overlapping
+  context joined so each text appears once per chapter pair; one tinted box per
+  stretch, a B stretch beside the A stretch it matched) had 134,926 pages,
+  460 MB; the 30-page preview took 25 s (mostly counting pages) and saving the
+  whole file 191 s. Joined stretches stacked in one column per side gave
+  111,681 pages / 413 MB / 127 s, one box per passage 134,385 pages / 477 MB /
+  152 s. Earlier layouts gave 83,831 pages / 337 MB / 130 s (two sentences) and
+  51,311 pages / 222 MB / 86 s (one sentence). Before yielding every ten pages
+  to drain PDFKit's output queue, the one-sentence export took 249 s. On two
+  real manuscripts kept outside the repository the three layouts gave 7,949 →
+  4,372 → 5,746 pages and 1,510 → 943 → 1,142 pages: separate aligned boxes
+  cost pages that one column per side saved.
 - `MAX_PASSAGES_PER_MATCH = 20` passages per chapter pair, strongest first, with
   `유사 문장 26개 · 상위 20개 표시` in the detail header.
 - The 내부 반복 detail pane lists at most 100 occurrences of a group (`외 882곳`

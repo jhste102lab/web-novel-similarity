@@ -198,8 +198,24 @@
   letter-spacing: -0.02em;
   padding: 0 4px;
 }
-.detail .cmp.chs + .cmp {
+.detail .cmp.chs + .blk {
   margin-top: 8px;
+}
+/* Stretches linked by findings: rows close together, blocks apart. */
+.detail .blk + .blk {
+  margin-top: 28px;
+}
+.detail .blk .cmp + .cmp {
+  margin-top: 8px;
+}
+.pane.none {
+  visibility: hidden;
+}
+.pane .lnk {
+  white-space: normal;
+  font-size: 12px;
+  color: var(--meta);
+  margin: -6px 0 10px;
 }
 .pane {
   white-space: pre-line;

@@ -13,16 +13,18 @@ export interface PdfPiece {
   text: string
   other?: string | null
 }
-/** One column: "원본.txt · 12화 · 3·5번째 문장" and its text in reading order. */
+/** One box: "원본.txt · 12화 · 3·5번째 문장" and its text in reading order. */
 export interface PdfSide {
   label: string
+  /** The other side's sentences it matched: "↔ B 6·30번째 문장". */
+  link?: string
   pieces: PdfPiece[]
 }
-/** Stretches of one chapter pair linked by findings; each text in it appears once. */
-export interface PdfBlock {
-  a: PdfSide[]
-  b: PdfSide[]
-}
+/**
+ * Stretches of one chapter pair linked by findings, each text once, in rows of boxes; a row
+ * pairs an A stretch with a B stretch it matched where it can, a side runs out with null.
+ */
+export type PdfBlock = { a: PdfSide | null; b: PdfSide | null }[]
 export interface PdfMatch {
   /** "원본.txt · 12화", one per side. */
   a: string
@@ -73,6 +75,8 @@ const LABEL_W = 92
 const PAD = 8
 /** Chip and label row on top of a passage column. */
 const HEAD = 20
+/** Extra heading row for the matched sentences of the other side. */
+const LINK = 11
 
 const BODY = 9
 const LINE = 14.5
@@ -376,30 +380,17 @@ function cover(l: Layout, input: PdfInput): void {
   l.y += 20
 }
 
-/** A column row: a wrapped line, or the chip and label of a further stretch. */
-type Item = Line | { label: string }
-
-/** Stacked stretches of one column; each after the first opens with a blank row and its label. */
-function column(l: Layout, sides: PdfSide[], key: Key): Item[] {
-  const out: Item[] = []
-  for (const [i, s] of sides.entries()) {
-    if (i > 0) out.push([], { label: s.label })
-    out.push(...l.wrap(pieceRuns(s, key), COL - PAD * 2, BODY))
+/** Tinted boxes of one row, side by side; split over pages, the heading only on top. */
+function boxes(l: Layout, sides: Record<Key, PdfSide | null>, again: () => void): void {
+  const lines = {
+    A: sides.A ? l.wrap(pieceRuns(sides.A, 'A'), COL - PAD * 2, BODY) : [],
+    B: sides.B ? l.wrap(pieceRuns(sides.B, 'B'), COL - PAD * 2, BODY) : [],
   }
-  return out
-}
-
-/** Two tinted columns of a block; split over pages, the top chip and label row only on top. */
-function block(
-  l: Layout,
-  labels: Record<Key, string>,
-  items: Record<Key, Item[]>,
-  again: () => void,
-): void {
-  const rows = Math.max(items.A.length, items.B.length)
+  const top0 = sides.A?.link || sides.B?.link ? HEAD + LINK : HEAD
+  const rows = Math.max(lines.A.length, lines.B.length)
   let i = 0
   while (i < rows) {
-    const head = i === 0 ? HEAD : 0
+    const head = i === 0 ? top0 : 0
     if (l.need(PAD * 2 + head + LINE)) again()
     const n = Math.min(rows - i, Math.floor((BOTTOM - l.y - PAD * 2 - head) / LINE))
     const h = PAD * 2 + head + n * LINE
@@ -408,23 +399,20 @@ function block(
       ['A', LEFT],
       ['B', LEFT + COL + GAP],
     ] as const) {
+      const side = sides[key]
+      if (!side) continue
       l.c?.rect(x, top, COL, h, SIDE[key].bg)
-      const label = (text: string, y: number): void => {
-        l.chip(key, x + PAD, y)
-        l.c?.text(
-          l.fit(text, COL - PAD * 2 - 18, SMALL),
-          x + PAD + 18,
-          y + 9.5,
-          SMALL,
-          SIDE[key].ink,
-        )
+      if (head) {
+        const w = COL - PAD * 2 - 18
+        l.chip(key, x + PAD, top + PAD)
+        l.c?.text(l.fit(side.label, w, SMALL), x + PAD + 18, top + PAD + 9.5, SMALL, SIDE[key].ink)
+        if (side.link) {
+          l.c?.text(l.fit(side.link, w, SMALL), x + PAD + 18, top + PAD + 9.5 + LINK, SMALL, META)
+        }
       }
-      if (head) label(labels[key], top + PAD)
       for (let k = 0; k < n; k++) {
-        const item = items[key][i + k]
-        const y = top + PAD + head + k * LINE
-        if (Array.isArray(item)) l.drawLine(item, x + PAD, y + BASE, BODY)
-        else if (item) label(item.label, y + 0.75)
+        const line = lines[key][i + k]
+        if (line) l.drawLine(line, x + PAD, top + PAD + head + k * LINE + BASE, BODY)
       }
     }
     l.y += h
@@ -435,19 +423,17 @@ function block(
 async function compareBody(l: Layout, rows: PdfMatch[]): Promise<void> {
   for (const m of rows) {
     const again = (): void => l.band(`A ${m.a}`, `B ${m.b}`, m.tier, true)
-    l.need(30 + PAD * 2 + HEAD + LINE * 2)
+    l.need(30 + PAD * 2 + HEAD + LINK + LINE * 2)
     l.band(`A ${m.a}`, `B ${m.b}`, m.tier, false)
-    for (const b of m.blocks) {
-      await l.breathe()
-      block(
-        l,
-        { A: b.a[0]!.label, B: b.b[0]!.label },
-        { A: column(l, b.a, 'A'), B: column(l, b.b, 'B') },
-        again,
-      )
-      l.y += 6
+    for (const block of m.blocks) {
+      for (const row of block) {
+        await l.breathe()
+        boxes(l, { A: row.a, B: row.b }, again)
+        l.y += 5
+      }
+      l.y += 9
     }
-    l.y += 12
+    l.y += 6
   }
 }
 

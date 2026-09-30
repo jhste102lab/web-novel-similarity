@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { aroundOf, joinOf, type Joined } from '../engine/context.ts'
+import { aroundOf, joinOf } from '../engine/context.ts'
 import { download, exportPdf, type Pdf } from '../export/exportPdf.ts'
-import type { PdfBlock, PdfInput, PdfSide } from '../export/pdf.ts'
-import type { CompareResult, Passage, RepeatResult, Span } from '../shared/types.ts'
+import type { PdfInput } from '../export/pdf.ts'
+import type { CompareResult, RepeatResult } from '../shared/types.ts'
+import { blocksOf, type JoinFn } from './blocks.ts'
 import { runInWorker, type Run } from '../worker/client.ts'
 import { AnalyzingScreen } from './AnalyzingScreen.tsx'
 import { Modal, type ModalProps } from './Modal.tsx'
@@ -195,21 +196,24 @@ export function App() {
   // Findings carry offsets into the text the search ran on; the same slot builds the same text.
   const slotA = results?.a ?? null
   const slotB = results?.b ?? null
-  const aroundA = useMemo(() => (slotA ? aroundOf(slotEngineText(slotA)) : null), [slotA])
-  const aroundB = useMemo(() => (slotB ? aroundOf(slotEngineText(slotB)) : null), [slotB])
+  const textA = useMemo(() => (slotA ? slotEngineText(slotA) : null), [slotA])
+  const textB = useMemo(() => (slotB ? slotEngineText(slotB) : null), [slotB])
+  const aroundA = useMemo(() => (textA ? aroundOf(textA) : null), [textA])
+  const joinA = useMemo(() => (textA ? joinOf(textA) : null), [textA])
+  const joinB = useMemo(() => (textB ? joinOf(textB) : null), [textB])
   const fileA = useMemo(() => (slotA ? slotFileAt(slotA) : null), [slotA])
   const fileB = useMemo(() => (slotB ? slotFileAt(slotB) : null), [slotB])
 
   // The report holds the active tab's findings (search ignored), in the order the list shows.
   // 내보내기 opens a preview of its first pages; saving asks, then builds the whole file.
   const startPdf = (): void => {
-    if (!results || !slotA || !fileA) return
+    if (!results || !joinA || !fileA) return
     const input = pdfInput(
       results,
       order,
       { compare: compareFilter, repeat: repeatFilter },
-      joinOf(slotEngineText(slotA)),
-      slotB ? joinOf(slotEngineText(slotB)) : null,
+      joinA,
+      joinB,
       fileA,
       fileB,
     )
@@ -366,8 +370,8 @@ export function App() {
             titleA={results.a.title}
             titleB={results.b?.title ?? ''}
             rangeNote={rangeNote(results.a, results.b)}
-            aroundA={aroundA!}
-            aroundB={aroundB!}
+            joinA={joinA!}
+            joinB={joinB!}
             fileA={fileA!}
             fileB={fileB!}
             running={results.run !== null}
@@ -475,8 +479,6 @@ function manuscriptLine(s: Slot): string {
   return b === null ? s.title : `${s.title} · ${b[0] === 1 ? '' : `${b[0]}~`}${b[1]}화`
 }
 
-type JoinFn = ReturnType<typeof joinOf>
-
 /** Report data: the findings of the active tab (search ignored) in list order, with context. */
 function pdfInput(
   r: { result: CompareResult | RepeatResult; a: Slot; b: Slot | null; stopped?: boolean },
@@ -545,59 +547,6 @@ function pdfInput(
       })),
     })),
   }
-}
-
-const spanKey = (s: Span): string => `${s.start}:${s.end}`
-const uniqueSpans = (spans: Span[]): Span[] => [
-  ...new Map(spans.map((s) => [spanKey(s), s])).values(),
-]
-
-/**
- * A chapter pair's findings for the report, each text shown once. Findings whose neighbour
- * sentences overlap are joined into one stretch per side; stretches linked by a finding share
- * a block, so an A sentence matched in several B places sits once beside all of them.
- */
-function blocksOf(
-  ps: Passage[],
-  joinA: JoinFn,
-  joinB: JoinFn,
-  fileA: FileFn,
-  fileB: FileFn,
-): PdfBlock[] {
-  // A finding matched in several places is marked against the first of them.
-  const ofA = (s: Span): string => ps.find((p) => spanKey(p.a) === spanKey(s))!.b.text
-  const ofB = (s: Span): string => ps.find((p) => spanKey(p.b) === spanKey(s))!.a.text
-  const side = (file: FileFn, spans: Span[], j: Joined, match: (s: Span) => string): PdfSide => {
-    const own = j.spans.map((i) => spans[i]!)
-    const nth = [...new Set(own.map((s) => (s.sentenceIndex + 1).toLocaleString()))].join('·')
-    return {
-      label: `${file(own[0]!.start)} · ${chapterLabel(own[0]!.chapter)} · ${nth}번째 문장`,
-      pieces: j.pieces.map((p) =>
-        p.span === undefined ? { text: p.text } : { text: p.text, other: match(spans[p.span]!) },
-      ),
-    }
-  }
-  const spansA = uniqueSpans(ps.map((p) => p.a))
-  const spansB = uniqueSpans(ps.map((p) => p.b))
-  const ja = joinA(spansA)
-  const jb = joinB(spansB)
-  // Stretch of each span, then stretches linked through findings: A i is node i, B j is |A|+j.
-  const stretch = (joined: Joined[], spans: Span[]): Map<string, number> =>
-    new Map(joined.flatMap((j, g) => j.spans.map((i) => [spanKey(spans[i]!), g] as const)))
-  const inA = stretch(ja, spansA)
-  const inB = stretch(jb, spansB)
-  const parent = Array.from({ length: ja.length + jb.length }, (_, i) => i)
-  const root = (x: number): number => (parent[x] === x ? x : (parent[x] = root(parent[x]!)))
-  for (const p of ps)
-    parent[root(inA.get(spanKey(p.a))!)] = root(ja.length + inB.get(spanKey(p.b))!)
-  const blocks = new Map<number, PdfBlock>()
-  ja.forEach((j, g) => {
-    const r = root(g)
-    if (!blocks.has(r)) blocks.set(r, { a: [], b: [] })
-    blocks.get(r)!.a.push(side(fileA, spansA, j, ofA))
-  })
-  jb.forEach((j, g) => blocks.get(root(ja.length + g))!.b.push(side(fileB, spansB, j, ofB)))
-  return [...blocks.values()]
 }
 
 function today(): string {

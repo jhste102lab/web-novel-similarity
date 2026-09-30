@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import type { Around } from '../engine/context.ts'
 import { charDiff } from '../engine/diff.ts'
-import type { ChapterMatch, CompareResult, Passage, Tier } from '../shared/types.ts'
+import type { PdfSide } from '../export/pdf.ts'
+import type { ChapterMatch, CompareResult, Tier } from '../shared/types.ts'
+import { blocksOf, type JoinFn } from './blocks.ts'
 import { CopyButton, pairText } from './CopyButton.tsx'
 import { Marked } from './Marked.tsx'
 import { ResultsShell, Tab, type ViewProps } from './ResultsShell.tsx'
@@ -9,7 +11,6 @@ import {
   chapterLabel,
   filterMatches,
   firstLine,
-  ordinal,
   searchMatches,
   sortMatches,
   TIER_CLASS,
@@ -24,19 +25,19 @@ export type FileFn = (pos: number) => string
 interface Props extends ViewProps<CompareResult, CompareFilter> {
   titleB: string
   rangeNote: string | null
-  aroundA: AroundFn
-  aroundB: AroundFn
+  joinA: JoinFn
+  joinB: JoinFn
   fileA: FileFn
   fileB: FileFn
 }
-/** A ↔ B results: one row per chapter pair, the detail pane shows its passages side by side. */
+/** A ↔ B results: one row per chapter pair, the detail pane shows its findings side by side. */
 export function CompareView({
   result,
   titleA,
   titleB,
   rangeNote,
-  aroundA,
-  aroundB,
+  joinA,
+  joinB,
   fileA,
   fileB,
   filter,
@@ -119,7 +120,7 @@ export function CompareView({
         </>
       )}
       renderDetail={(m) => (
-        <MatchDetail m={m} aroundA={aroundA} aroundB={aroundB} fileA={fileA} fileB={fileB} />
+        <MatchDetail m={m} joinA={joinA} joinB={joinB} fileA={fileA} fileB={fileB} />
       )}
     />
   )
@@ -127,18 +128,22 @@ export function CompareView({
 
 function MatchDetail({
   m,
-  aroundA,
-  aroundB,
+  joinA,
+  joinB,
   fileA,
   fileB,
 }: {
   m: ChapterMatch
-  aroundA: AroundFn
-  aroundB: AroundFn
+  joinA: JoinFn
+  joinB: JoinFn
   fileA: FileFn
   fileB: FileFn
 }) {
   const first = m.passages[0]!
+  const blocks = useMemo(
+    () => blocksOf(m.passages, joinA, joinB, fileA, fileB),
+    [m, joinA, joinB, fileA, fileB],
+  )
   return (
     <>
       <div className="head">
@@ -155,55 +160,47 @@ function MatchDetail({
         <div>{chapterLabel(m.a)}</div>
         <div>{chapterLabel(m.b)}</div>
       </div>
-      {m.passages.map((p, i) => (
-        <PassagePair
-          key={i}
-          p={p}
-          aroundA={aroundA}
-          aroundB={aroundB}
-          fileA={fileA}
-          fileB={fileB}
-        />
+      {blocks.map((rows, i) => (
+        <div key={i} className="blk">
+          {rows.map((r, j) => (
+            <div key={j} className="cmp">
+              <Stretch side={r.a} k="A" />
+              <Stretch side={r.b} k="B" />
+            </div>
+          ))}
+        </div>
       ))}
     </>
   )
 }
 
-function PassagePair({
-  p,
-  aroundA,
-  aroundB,
-  fileA,
-  fileB,
-}: {
-  p: Passage
-  aroundA: AroundFn
-  aroundB: AroundFn
-  fileA: FileFn
-  fileB: FileFn
-}) {
-  const diff = useMemo(() => charDiff(p.a.text, p.b.text), [p])
-  const a = aroundA(p.a.start, p.a.end)
-  const b = aroundB(p.b.start, p.b.end)
+/** One side's stretch: neighbours dimmed, each finding marked against the text it matched. */
+function Stretch({ side, k }: { side: PdfSide | null; k: 'A' | 'B' }) {
+  if (!side) return <div className="pane none" />
+  const found = side.pieces.filter((p) => typeof p.other === 'string')
   return (
-    <div className="cmp">
-      <div className="pane">
-        <div className="k">
-          <b>A</b> {fileA(p.a.start)} · {chapterLabel(p.a.chapter)} · {ordinal(p.a)}
-          <CopyButton a={p.a.text} b={p.b.text} />
-        </div>
-        <Context around={a}>
-          <Marked diff={diff} side="a" />
-        </Context>
+    <div className="pane">
+      <div className="k">
+        <b>{k}</b> {side.label}
+        <CopyButton
+          a={found.map((p) => (k === 'A' ? p.text : p.other)).join('\n')}
+          b={found.map((p) => (k === 'A' ? p.other : p.text)).join('\n')}
+        />
       </div>
-      <div className="pane">
-        <div className="k">
-          <b>B</b> {fileB(p.b.start)} · {chapterLabel(p.b.chapter)} · {ordinal(p.b)}
-        </div>
-        <Context around={b}>
-          <Marked diff={diff} side="b" />
-        </Context>
-      </div>
+      <div className="lnk">{side.link}</div>
+      {side.pieces.map((p, i) =>
+        typeof p.other === 'string' ? (
+          <Marked
+            key={i}
+            diff={k === 'A' ? charDiff(p.text, p.other) : charDiff(p.other, p.text)}
+            side={k === 'A' ? 'a' : 'b'}
+          />
+        ) : (
+          <span key={i} className="ctx">
+            {p.text}
+          </span>
+        ),
+      )}
     </div>
   )
 }
